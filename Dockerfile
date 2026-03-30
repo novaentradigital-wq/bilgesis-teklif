@@ -7,7 +7,6 @@ COPY server/package.json server/package-lock.json* ./
 RUN npm install --production
 
 COPY server/server.js ./server.js
-COPY server/.env ./.env
 
 # Frontend dosyalarını kopyala
 COPY uygulama/ ./uygulama/
