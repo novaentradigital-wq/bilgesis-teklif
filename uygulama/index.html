@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BİLGESİS - Teklif Yönetim Sistemi</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+
+    <!-- ==================== GİRİŞ EKRANI ==================== -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-logo">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                </div>
+                <h1>BİLGESİS</h1>
+                <p>Teklif Yönetim Sistemi</p>
+            </div>
+            <form id="loginForm" onsubmit="return handleLogin(event)">
+                <div class="form-group">
+                    <label><i class="fas fa-user"></i> Kullanıcı Adı</label>
+                    <input type="text" id="loginUsername" required placeholder="Kullanıcı adınız" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-lock"></i> Şifre</label>
+                    <input type="password" id="loginPassword" required placeholder="Şifreniz" autocomplete="current-password">
+                </div>
+                <div id="loginError" class="login-error" style="display:none"></div>
+                <button type="submit" class="btn btn-primary login-btn">
+                    <i class="fas fa-sign-in-alt"></i> Giriş Yap
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==================== ANA UYGULAMA ==================== -->
+    <div class="app-wrapper" id="appWrapper" style="display:none">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                </div>
+                <div class="logo-text">
+                    <span class="brand-name">BİLGESİS</span>
+                    <span class="brand-sub">Teklif Yönetim</span>
+                </div>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-page="dashboard">
+                <i class="fas fa-chart-line"></i>
+                <span>Gösterge Paneli</span>
+            </a>
+            <a href="#" class="nav-item" data-page="new-proposal">
+                <i class="fas fa-plus-circle"></i>
+                <span>Yeni Teklif</span>
+            </a>
+            <a href="#" class="nav-item" data-page="proposals">
+                <i class="fas fa-file-invoice"></i>
+                <span>Teklifler</span>
+            </a>
+            <a href="#" class="nav-item" data-page="reminders">
+                <i class="fas fa-bell"></i>
+                <span>Hatırlatmalar</span>
+                <span class="nav-badge" id="reminderNavBadge" style="display:none">0</span>
+            </a>
+            <a href="#" class="nav-item" data-page="customers">
+                <i class="fas fa-users"></i>
+                <span>Müşteriler</span>
+            </a>
+            <a href="#" class="nav-item" data-page="products">
+                <i class="fas fa-box-open"></i>
+                <span>Ürünler</span>
+            </a>
+            <a href="#" class="nav-item admin-only" data-page="personnel">
+                <i class="fas fa-user-shield"></i>
+                <span>Personel Yönetimi</span>
+            </a>
+            <a href="#" class="nav-item" data-page="settings">
+                <i class="fas fa-cog"></i>
+                <span>Ayarlar</span>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="company-info-mini">
+                <p>BİLGESİS Teklif</p>
+                <p class="text-muted">v2.0.0</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Bar -->
+        <header class="topbar">
+            <button class="menu-toggle" id="menuToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="topbar-title">
+                <h2 id="pageTitle">Gösterge Paneli</h2>
+            </div>
+            <div class="topbar-actions">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Teklif ara..." id="globalSearch">
+                </div>
+                <button class="btn-icon notification-btn" title="Hatırlatmalar" onclick="navigateTo('reminders')">
+                    <i class="fas fa-bell"></i>
+                    <span class="badge" id="notifBadge">0</span>
+                </button>
+                <div class="user-menu" onclick="toggleUserDropdown()">
+                    <div class="user-avatar" id="userAvatar">YO</div>
+                    <span class="user-name" id="userName">Yönetici</span>
+                    <i class="fas fa-chevron-down" style="font-size:0.65rem;color:var(--text-muted)"></i>
+                </div>
+                <div class="user-dropdown" id="userDropdown">
+                    <div class="dropdown-header" id="dropdownUserInfo"></div>
+                    <a href="#" onclick="navigateTo('settings');closeUserDropdown();return false"><i class="fas fa-cog"></i> Ayarlar</a>
+                    <a href="#" onclick="handleLogout();return false"><i class="fas fa-sign-out-alt"></i> Çıkış Yap</a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Hatırlatma Banner -->
+        <div class="reminder-banner" id="reminderBanner" style="display:none">
+            <div class="reminder-banner-content">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span id="reminderBannerText"></span>
+                <button class="btn btn-sm btn-outline" onclick="navigateTo('reminders')" style="margin-left:auto;color:#fff;border-color:rgba(255,255,255,0.5)">
+                    Hatırlatmaları Gör
+                </button>
+                <button class="btn-icon" onclick="document.getElementById('reminderBanner').style.display='none'" style="color:#fff;background:transparent">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Pages Container -->
+        <div class="page-container">
+
+            <!-- ==================== DASHBOARD ==================== -->
+            <section class="page active" id="page-dashboard">
+                <div class="stats-grid">
+                    <div class="stat-card stat-card-clickable" onclick="filterProposalsByStatus('all')" title="Tüm teklifleri görüntüle">
+                        <div class="stat-icon bg-primary"><i class="fas fa-file-invoice"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="totalProposals">0</span>
+                            <span class="stat-label">Toplam Teklif</span>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-card-clickable" onclick="filterProposalsByStatus('bekleyen')" title="Bekleyen teklifleri görüntüle">
+                        <div class="stat-icon bg-warning"><i class="fas fa-clock"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="pendingProposals">0</span>
+                            <span class="stat-label">Bekleyen</span>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-card-clickable" onclick="filterProposalsByStatus('kabul')" title="Kabul edilen teklifleri görüntüle">
+                        <div class="stat-icon bg-success"><i class="fas fa-check-circle"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="acceptedProposals">0</span>
+                            <span class="stat-label">Kabul Edilen</span>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-card-clickable" onclick="filterProposalsByStatus('red')" title="Reddedilen teklifleri görüntüle">
+                        <div class="stat-icon bg-danger"><i class="fas fa-times-circle"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="rejectedProposals">0</span>
+                            <span class="stat-label">Reddedilen</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dashboard Hatırlatma Özeti -->
+                <div class="card reminder-summary-card" id="dashReminderCard" style="display:none">
+                    <div class="card-header" style="background:var(--warning-bg);border-left:4px solid var(--warning)">
+                        <h3><i class="fas fa-bell" style="color:var(--warning)"></i> Bugünkü Hatırlatmalar</h3>
+                        <a href="#" class="btn-link" onclick="navigateTo('reminders');return false">Tümünü Gör</a>
+                    </div>
+                    <div class="card-body" id="dashReminderBody"></div>
+                </div>
+
+                <div class="content-grid">
+                    <div class="card recent-proposals">
+                        <div class="card-header">
+                            <h3><i class="fas fa-history"></i> Son Teklifler</h3>
+                            <a href="#" class="btn-link" data-page="proposals">Tümünü Gör</a>
+                        </div>
+                        <div class="card-body">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Teklif No</th>
+                                        <th>Müşteri</th>
+                                        <th>Temsilci</th>
+                                        <th>Tutar</th>
+                                        <th>Durum</th>
+                                        <th>Tarih</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentProposalsBody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card quick-actions">
+                        <div class="card-header">
+                            <h3><i class="fas fa-bolt"></i> Hızlı İşlemler</h3>
+                        </div>
+                        <div class="card-body">
+                            <button class="quick-btn" data-page="new-proposal">
+                                <i class="fas fa-plus"></i>
+                                <span>Yeni Teklif Oluştur</span>
+                            </button>
+                            <button class="quick-btn" data-page="customers">
+                                <i class="fas fa-user-plus"></i>
+                                <span>Müşteri Ekle</span>
+                            </button>
+                            <button class="quick-btn" data-page="products">
+                                <i class="fas fa-boxes-stacked"></i>
+                                <span>Ürün Ekle</span>
+                            </button>
+                            <button class="quick-btn" onclick="exportAllProposals()">
+                                <i class="fas fa-download"></i>
+                                <span>Teklifleri Dışa Aktar</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== NEW PROPOSAL ==================== -->
+            <section class="page" id="page-new-proposal">
+                <form id="proposalForm" class="proposal-form">
+                    <input type="hidden" id="editProposalId" value="">
+
+                    <!-- Müşteri Bilgileri -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-building"></i> Müşteri Bilgileri</h3>
+                            <div class="header-actions">
+                                <select id="customerSelect" class="form-select">
+                                    <option value="">Kayıtlı müşteri seçin...</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="card-body compact">
+                            <div class="form-grid cols-3">
+                                <div class="form-group">
+                                    <label>Firma / Müşteri Adı <span class="required">*</span></label>
+                                    <input type="text" id="customerName" required placeholder="Firma adını girin">
+                                </div>
+                                <div class="form-group">
+                                    <label>Yetkili Adı Soyadı</label>
+                                    <input type="text" id="contactPerson" placeholder="Ad Soyad">
+                                </div>
+                                <div class="form-group">
+                                    <label>Telefon</label>
+                                    <input type="tel" id="customerPhone" placeholder="(xxx) xxx xx xx">
+                                </div>
+                                <div class="form-group">
+                                    <label>E-posta</label>
+                                    <input type="email" id="customerEmail" placeholder="ornek@firma.com">
+                                </div>
+                                <div class="form-group">
+                                    <label>Faks</label>
+                                    <input type="text" id="customerFax" placeholder="(xxx) xxx xx xx">
+                                </div>
+                                <div class="form-group">
+                                    <label>Vergi Dairesi</label>
+                                    <input type="text" id="taxOffice" placeholder="Vergi dairesi">
+                                </div>
+                                <div class="form-group">
+                                    <label>Vergi No</label>
+                                    <input type="text" id="taxNumber" placeholder="Vergi numarası">
+                                </div>
+                                <div class="form-group">
+                                    <label>Teslim Tarihi</label>
+                                    <input type="text" id="deliveryDate" placeholder="Teslim tarihi">
+                                </div>
+                                <div class="form-group">
+                                    <label>Adres</label>
+                                    <input type="text" id="customerAddress" placeholder="Firma adresi">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Teklif Detayları -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-cog"></i> Teklif Detayları</h3>
+                        </div>
+                        <div class="card-body compact">
+                            <div class="form-grid cols-3">
+                                <div class="form-group">
+                                    <label>Sipariş No</label>
+                                    <input type="text" id="orderNo" placeholder="Otomatik" readonly style="background:#f5f5f5;cursor:default">
+                                </div>
+                                <div class="form-group">
+                                    <label>Teklif Tarihi</label>
+                                    <input type="date" id="proposalDate">
+                                </div>
+                                <div class="form-group">
+                                    <label>Para Birimi</label>
+                                    <select id="currency" class="form-select">
+                                        <option value="USD">USD ($)</option>
+                                        <option value="EUR">EUR (€)</option>
+                                        <option value="TL">TL (₺)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>KDV Oranı (%)</label>
+                                    <input type="number" id="kdvRate" value="20" min="0" max="100">
+                                </div>
+                                <div class="form-group">
+                                    <label>Ödeme Planı</label>
+                                    <select id="paymentPlan" class="form-select">
+                                        <option value="PEŞİN">PEŞİN</option>
+                                        <option value="30 GÜN VADELİ">30 GÜN VADELİ</option>
+                                        <option value="60 GÜN VADELİ">60 GÜN VADELİ</option>
+                                        <option value="ANLAŞMAYA GÖRE">ANLAŞMAYA GÖRE</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Hatırlatma Tarihi <span class="required">*</span></label>
+                                    <input type="date" id="reminderDate" required>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ürün Bilgileri -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-box-open"></i> Ürün Bilgileri</h3>
+                            <div class="header-actions">
+                                <select id="productSelect" class="form-select">
+                                    <option value="">Kayıtlı ürün ekle...</option>
+                                </select>
+                                <button type="button" class="btn btn-primary btn-sm" onclick="addProductRow()">
+                                    <i class="fas fa-plus"></i> Satır Ekle
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="data-table product-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:40px">#</th>
+                                            <th>Ürün Bilgisi</th>
+                                            <th style="width:130px">Birim Fiyatı</th>
+                                            <th style="width:80px">Adet</th>
+                                            <th style="width:130px">Tutarı</th>
+                                            <th style="width:50px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="productTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Toplam Alanı -->
+                            <div class="totals-section">
+                                <div class="discount-row">
+                                    <label><i class="fas fa-tag"></i> Size Özel İndirim:</label>
+                                    <input type="number" id="discountAmount" value="0" step="0.01" min="0" onchange="calculateTotals()">
+                                </div>
+                                <div class="totals-box">
+                                    <div class="total-row">
+                                        <span>Ara Toplam:</span>
+                                        <span id="subtotal">0,00</span>
+                                    </div>
+                                    <div class="total-row discount">
+                                        <span>İndirim:</span>
+                                        <span id="discountDisplay">-0,00</span>
+                                    </div>
+                                    <div class="total-row">
+                                        <span>Ara Toplam (İndirimli):</span>
+                                        <span id="discountedSubtotal">0,00</span>
+                                    </div>
+                                    <div class="total-row">
+                                        <span>KDV (<span id="kdvRateDisplay">20</span>%):</span>
+                                        <span id="kdvAmount">0,00</span>
+                                    </div>
+                                    <div class="total-row grand-total">
+                                        <span>GENEL TOPLAM:</span>
+                                        <span id="grandTotal">0,00</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ek Hizmetler & Notlar -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-clipboard-list"></i> Ek Hizmetler & Notlar</h3>
+                        </div>
+                        <div class="card-body compact">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Ek Hizmetler</label>
+                                    <textarea id="additionalServices" rows="2" placeholder="Ek hizmetler..."></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>Teklif Notları</label>
+                                    <textarea id="proposalNotes" rows="2" placeholder="Özel notlar veya koşullar..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Form Butonları -->
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline" onclick="resetForm()">
+                            <i class="fas fa-eraser"></i> Temizle
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="saveAsDraft()">
+                            <i class="fas fa-save"></i> Taslak Kaydet
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="previewPDF()">
+                            <i class="fas fa-eye"></i> PDF Önizle
+                        </button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-paper-plane"></i> Teklifi Kaydet
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- ==================== PROPOSALS LIST ==================== -->
+            <section class="page" id="page-proposals">
+                <div class="page-toolbar">
+                    <div class="toolbar-left">
+                        <div class="filter-group">
+                            <select id="statusFilter" class="form-select" onchange="renderProposals()">
+                                <option value="all">Tüm Durumlar</option>
+                                <option value="bekleyen">Bekleyen (Taslak + Gönderildi)</option>
+                                <option value="taslak">Taslak</option>
+                                <option value="gönderildi">Gönderildi</option>
+                                <option value="kabul">Kabul Edildi</option>
+                                <option value="red">Reddedildi</option>
+                            </select>
+                            <input type="text" id="proposalSearch" placeholder="Teklif veya müşteri ara..." class="form-input" oninput="renderProposals()">
+                        </div>
+                    </div>
+                    <div class="toolbar-right">
+                        <button class="btn btn-primary" data-page="new-proposal">
+                            <i class="fas fa-plus"></i> Yeni Teklif
+                        </button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-body no-padding">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Teklif No</th>
+                                    <th>Müşteri</th>
+                                    <th>Temsilci</th>
+                                    <th>Tarih</th>
+                                    <th>Tutar</th>
+                                    <th>Durum</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody id="proposalsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== HATIRLATMALAR & GÖRÜŞME TAKİP ==================== -->
+            <section class="page" id="page-reminders">
+                <div class="page-toolbar">
+                    <div class="toolbar-left">
+                        <div class="filter-group">
+                            <select id="reminderFilter" class="form-select" onchange="renderReminders()">
+                                <option value="active">Aktif Hatırlatmalar</option>
+                                <option value="overdue">Gecikmiş</option>
+                                <option value="today">Bugün</option>
+                                <option value="completed">Tamamlanan</option>
+                                <option value="all">Tümü</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hatırlatma Kartları -->
+                <div id="remindersContainer"></div>
+            </section>
+
+            <!-- ==================== CUSTOMERS ==================== -->
+            <section class="page" id="page-customers">
+                <div class="page-toolbar">
+                    <div class="toolbar-left">
+                        <input type="text" id="customerSearch" placeholder="Müşteri ara..." class="form-input" oninput="renderCustomers()">
+                    </div>
+                    <div class="toolbar-right">
+                        <button class="btn btn-primary" onclick="showCustomerModal()">
+                            <i class="fas fa-plus"></i> Yeni Müşteri
+                        </button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-body no-padding">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Firma Adı</th>
+                                    <th>Yetkili</th>
+                                    <th>Telefon</th>
+                                    <th>E-posta</th>
+                                    <th>Teklif Sayısı</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody id="customersTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== PRODUCTS ==================== -->
+            <section class="page" id="page-products">
+                <div class="page-toolbar">
+                    <div class="toolbar-left">
+                        <input type="text" id="productSearch" placeholder="Ürün ara..." class="form-input" oninput="renderProducts()">
+                    </div>
+                    <div class="toolbar-right">
+                        <button class="btn btn-primary" onclick="showProductModal()">
+                            <i class="fas fa-plus"></i> Yeni Ürün
+                        </button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-body no-padding">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Ürün Adı</th>
+                                    <th>Kategori</th>
+                                    <th>Birim Fiyat</th>
+                                    <th>Para Birimi</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody id="productsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== PERSONEL YÖNETİMİ ==================== -->
+            <section class="page" id="page-personnel">
+                <div class="page-toolbar">
+                    <div class="toolbar-left">
+                        <h3 style="margin:0;color:var(--primary)">Personel / Kullanıcı Yönetimi</h3>
+                    </div>
+                    <div class="toolbar-right">
+                        <button class="btn btn-primary" onclick="showPersonnelModal()">
+                            <i class="fas fa-user-plus"></i> Yeni Personel
+                        </button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-body no-padding">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Ad Soyad</th>
+                                    <th>Kullanıcı Adı</th>
+                                    <th>Rol</th>
+                                    <th>E-posta</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody id="personnelTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== SETTINGS ==================== -->
+            <section class="page" id="page-settings">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-building"></i> Firma Bilgileri</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-grid">
+                            <div class="form-group full-width">
+                                <label>Firma Unvanı</label>
+                                <input type="text" id="settCompanyName" value="BİLGESİS BİLGİ TEKNOLOJİLERİ SAN. TİC. LTD ŞTİ.">
+                            </div>
+                            <div class="form-group full-width">
+                                <label>Adres</label>
+                                <input type="text" id="settAddress" value="">
+                            </div>
+                            <div class="form-group">
+                                <label>Telefon</label>
+                                <input type="text" id="settPhone" value="">
+                            </div>
+                            <div class="form-group">
+                                <label>Faks</label>
+                                <input type="text" id="settFax" value="">
+                            </div>
+                            <div class="form-group">
+                                <label>Web Sitesi</label>
+                                <input type="text" id="settWebsite" value="">
+                            </div>
+                            <div class="form-group">
+                                <label>E-posta</label>
+                                <input type="email" id="settEmail" value="">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-envelope"></i> E-posta Ayarları</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-grid">
+                            <div class="form-group full-width">
+                                <label>E-posta Konu Şablonu</label>
+                                <input type="text" id="settEmailSubject" value="BİLGESİS - Sipariş & Teklif Formu - {proposalNo}">
+                            </div>
+                            <div class="form-group full-width">
+                                <label>E-posta Mesaj Şablonu</label>
+                                <textarea id="settEmailBody" rows="5">Sayın {customerName},
+
+Talebiniz doğrultusunda hazırlamış olduğumuz teklif formunu ekte bilgilerinize sunarız.
+
+Teklifimiz 7 gün süre ile geçerlidir.
+
+Detaylı bilgi için bizimle iletişime geçebilirsiniz.
+
+Saygılarımızla,
+BİLGESİS Bilgi Teknolojileri</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-file-pdf"></i> PDF Ayarları</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-grid">
+                            <div class="form-group full-width">
+                                <label>PDF Alt Notlar (her satır ayrı not)</label>
+                                <textarea id="settPdfNotes" rows="5">* Faturaya esas olacak tutar TL cinsinden olup, fatura tarihindeki T.C.M.B döviz satış kuru üzerinden hesaplanacaktır.
+* Teklifimiz 7 gün süre ile geçerlidir.
+* Satış fiyatları belirtilen adetler için geçerli olup, adetlerin değişmesi halinde teklif revize edilecektir.</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn btn-success" onclick="saveSettings()">
+                        <i class="fas fa-save"></i> Ayarları Kaydet
+                    </button>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    </div><!-- /app-wrapper -->
+
+    <!-- Modal: Müşteri -->
+    <div class="modal-overlay" id="customerModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="customerModalTitle">Yeni Müşteri</h3>
+                <button class="modal-close" onclick="closeModal('customerModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editCustomerId">
+                <div class="form-group">
+                    <label>Firma Adı <span class="required">*</span></label>
+                    <input type="text" id="modalCustName" required>
+                </div>
+                <div class="form-group">
+                    <label>Yetkili Adı Soyadı</label>
+                    <input type="text" id="modalCustContact">
+                </div>
+                <div class="form-group">
+                    <label>Telefon</label>
+                    <input type="tel" id="modalCustPhone">
+                </div>
+                <div class="form-group">
+                    <label>E-posta</label>
+                    <input type="email" id="modalCustEmail">
+                </div>
+                <div class="form-group">
+                    <label>Faks</label>
+                    <input type="text" id="modalCustFax">
+                </div>
+                <div class="form-group">
+                    <label>Vergi Dairesi</label>
+                    <input type="text" id="modalCustTaxOffice">
+                </div>
+                <div class="form-group">
+                    <label>Vergi No</label>
+                    <input type="text" id="modalCustTaxNo">
+                </div>
+                <div class="form-group">
+                    <label>Adres</label>
+                    <textarea id="modalCustAddress" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('customerModal')">İptal</button>
+                <button class="btn btn-success" onclick="saveCustomer()">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Ürün -->
+    <div class="modal-overlay" id="productModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="productModalTitle">Yeni Ürün</h3>
+                <button class="modal-close" onclick="closeModal('productModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editProductId">
+                <div class="form-group">
+                    <label>Ürün Adı <span class="required">*</span></label>
+                    <input type="text" id="modalProdName" required>
+                </div>
+                <div class="form-group">
+                    <label>Kategori</label>
+                    <select id="modalProdCategory" class="form-select">
+                        <option value="Donanım">Donanım</option>
+                        <option value="Yazılım">Yazılım</option>
+                        <option value="Ağ / Network">Ağ / Network</option>
+                        <option value="Güvenlik">Güvenlik</option>
+                        <option value="Hizmet">Hizmet</option>
+                        <option value="Diğer">Diğer</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Birim Fiyat</label>
+                    <input type="number" id="modalProdPrice" step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Para Birimi</label>
+                    <select id="modalProdCurrency" class="form-select">
+                        <option value="USD">USD ($)</option>
+                        <option value="EUR">EUR (€)</option>
+                        <option value="TL">TL (₺)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('productModal')">İptal</button>
+                <button class="btn btn-success" onclick="saveProduct()">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Personel -->
+    <div class="modal-overlay" id="personnelModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="personnelModalTitle">Yeni Personel</h3>
+                <button class="modal-close" onclick="closeModal('personnelModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editPersonnelId">
+                <div class="form-group">
+                    <label>Ad Soyad <span class="required">*</span></label>
+                    <input type="text" id="modalPersName" required>
+                </div>
+                <div class="form-group">
+                    <label>Kullanıcı Adı <span class="required">*</span></label>
+                    <input type="text" id="modalPersUsername" required>
+                </div>
+                <div class="form-group">
+                    <label>Şifre <span class="required">*</span></label>
+                    <input type="password" id="modalPersPassword">
+                </div>
+                <div class="form-group">
+                    <label>E-posta</label>
+                    <input type="email" id="modalPersEmail">
+                </div>
+                <div class="form-group">
+                    <label>Rol</label>
+                    <select id="modalPersRole" class="form-select">
+                        <option value="personel">Personel</option>
+                        <option value="admin">Yönetici</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('personnelModal')">İptal</button>
+                <button class="btn btn-success" onclick="savePersonnel()">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: PDF Önizleme -->
+    <div class="modal-overlay" id="pdfPreviewModal">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h3>PDF Önizleme</h3>
+                <button class="modal-close" onclick="closeModal('pdfPreviewModal')">&times;</button>
+            </div>
+            <div class="modal-body" style="padding:0; height:70vh;">
+                <iframe id="pdfPreviewFrame" style="width:100%;height:100%;border:none;"></iframe>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('pdfPreviewModal')">Kapat</button>
+                <button class="btn btn-primary" onclick="downloadCurrentPDF()">
+                    <i class="fas fa-download"></i> PDF İndir
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Teklif Gönder (E-posta / WhatsApp) -->
+    <div class="modal-overlay" id="sendModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-share-alt"></i> Teklif Gönder</h3>
+                <button class="modal-close" onclick="closeModal('sendModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="sendProposalId">
+
+                <div class="send-tabs">
+                    <button class="send-tab active" onclick="switchSendTab('email')" id="tabEmail">
+                        <i class="fas fa-envelope"></i> E-posta
+                    </button>
+                    <button class="send-tab" onclick="switchSendTab('whatsapp')" id="tabWhatsapp">
+                        <i class="fab fa-whatsapp"></i> WhatsApp
+                    </button>
+                </div>
+
+                <!-- E-posta Tab -->
+                <div class="send-tab-content active" id="sendEmailContent">
+                    <div class="form-group">
+                        <label>Alıcı E-posta <span class="required">*</span></label>
+                        <input type="email" id="sendEmailTo" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Konu</label>
+                        <input type="text" id="sendEmailSubject">
+                    </div>
+                    <div class="form-group">
+                        <label>Mesaj</label>
+                        <textarea id="sendEmailBody" rows="4"></textarea>
+                    </div>
+                    <div class="send-options">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="sendPdfAttach" checked> PDF eki ile gönder
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="sendAcceptLink" checked> Kabul linki ekle
+                        </label>
+                    </div>
+                </div>
+
+                <!-- WhatsApp Tab -->
+                <div class="send-tab-content" id="sendWhatsappContent">
+                    <div class="form-group">
+                        <label>Telefon Numarası <span class="required">*</span></label>
+                        <input type="tel" id="sendWhatsappPhone" placeholder="905xxxxxxxxx">
+                        <small style="color:var(--text-muted)">Ülke kodu ile birlikte (örn: 905321234567)</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Mesaj</label>
+                        <textarea id="sendWhatsappMsg" rows="4"></textarea>
+                    </div>
+                    <div class="send-options">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="sendWaPdf" checked> PDF indir ve gönder
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="sendWaLink" checked> Teklif kabul linki ekle
+                        </label>
+                    </div>
+                    <div class="wa-actions" style="display:flex;gap:8px;margin-top:10px">
+                        <button type="button" class="btn btn-sm btn-outline" onclick="downloadProposalPdfForSend()">
+                            <i class="fas fa-file-pdf"></i> PDF İndir
+                        </button>
+                    </div>
+                </div>
+
+                <div class="email-info">
+                    <i class="fas fa-info-circle"></i>
+                    <span>PDF önce indirilecek, ardından WhatsApp/E-posta açılacaktır. İndirilen PDF'i WhatsApp'ta dosya olarak paylaşabilirsiniz.</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('sendModal')">İptal</button>
+                <button class="btn btn-success" onclick="executeSend()">
+                    <i class="fas fa-paper-plane"></i> Gönder
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Görüşme Sonucu -->
+    <div class="modal-overlay" id="callResultModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-phone"></i> Görüşme Sonucu Gir</h3>
+                <button class="modal-close" onclick="closeModal('callResultModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="callResultProposalId">
+                <div class="form-group">
+                    <label>Görüşme Durumu</label>
+                    <select id="callResultStatus" class="form-select" onchange="toggleNextCallDate()">
+                        <option value="arandı">Arandı - Görüşüldü</option>
+                        <option value="ulaşılamadı">Ulaşılamadı</option>
+                        <option value="tekrar_ara">Tekrar Aranacak</option>
+                        <option value="kabul">Teklif Kabul Edildi</option>
+                        <option value="red">Teklif Reddedildi</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Görüşme Notu</label>
+                    <textarea id="callResultNote" rows="3" placeholder="Görüşme detaylarını yazın..."></textarea>
+                </div>
+                <div class="form-group" id="nextCallDateGroup">
+                    <label>Sonraki Arama Tarihi <span class="required">*</span></label>
+                    <input type="date" id="nextCallDate">
+                    <small style="color:var(--text-muted)">Kabul/Red dışında zorunludur</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('callResultModal')">İptal</button>
+                <button class="btn btn-success" onclick="saveCallResult()">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Hatırlatma Detay -->
+    <div class="modal-overlay" id="reminderDetailModal">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h3><i class="fas fa-file-invoice"></i> <span id="rdTitle">Teklif Detay</span></h3>
+                <button class="modal-close" onclick="closeModal('reminderDetailModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="rdBody" style="padding:0;max-height:75vh;overflow-y:auto">
+            </div>
+            <div class="modal-footer" id="rdFooter">
+            </div>
+        </div>
+    </div>
+
+    <!-- Onay Modalı -->
+    <div class="modal-overlay" id="confirmModal">
+        <div class="modal confirm-modal">
+            <div class="confirm-modal-icon" id="confirmModalIcon"></div>
+            <h3 class="confirm-modal-title" id="confirmModalTitle"></h3>
+            <p class="confirm-modal-desc" id="confirmModalDesc"></p>
+            <div class="confirm-modal-info" id="confirmModalInfo"></div>
+            <div class="confirm-modal-actions">
+                <button class="btn btn-outline" id="confirmModalCancel" onclick="closeConfirmModal(false)">
+                    <i class="fas fa-arrow-left"></i> Vazgeç
+                </button>
+                <button class="btn" id="confirmModalOk">
+                    Onayla
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="js/app.js"></script>
+    <script src="js/pdf.js"></script>
+</body>
+</html>
