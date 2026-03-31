@@ -375,6 +375,41 @@ function rowToProposal(row) {
     };
 }
 
+// ============ E-POSTA GÖNDERME ============
+const nodemailer = require('nodemailer');
+
+app.post('/api/send-email', async (req, res) => {
+    try {
+        const { to, subject, body, smtpHost, smtpPort, smtpUser, smtpPass, fromName } = req.body;
+
+        if (!to || !smtpHost || !smtpUser || !smtpPass) {
+            return res.status(400).json({ error: 'SMTP ayarları ve alıcı e-posta gereklidir.' });
+        }
+
+        const transporter = nodemailer.createTransport({
+            host: smtpHost,
+            port: parseInt(smtpPort) || 587,
+            secure: parseInt(smtpPort) === 465,
+            auth: {
+                user: smtpUser,
+                pass: smtpPass
+            }
+        });
+
+        await transporter.sendMail({
+            from: `"${fromName || smtpUser}" <${smtpUser}>`,
+            to: to,
+            subject: subject || '',
+            text: body || ''
+        });
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('E-posta gönderme hatası:', err.message);
+        res.status(500).json({ error: 'E-posta gönderilemedi: ' + err.message });
+    }
+});
+
 // SPA: tüm route'ları index.html'e yönlendir
 app.get('*', (req, res) => {
     res.sendFile(path.join(frontendPath, 'index.html'));

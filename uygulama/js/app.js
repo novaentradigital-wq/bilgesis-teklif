@@ -1357,7 +1357,7 @@ function switchSendTab(tab) {
     }
 }
 
-function executeSend() {
+async function executeSend() {
     const proposalId = document.getElementById('sendProposalId').value;
     const proposals = DB.get('proposals');
     const p = proposals.find(pr => pr.id === proposalId);
@@ -1374,9 +1374,10 @@ function executeSend() {
             return;
         }
 
-        // Download PDF if option checked
-        if (document.getElementById('sendPdfAttach').checked && p) {
-            generateProposalPDF(p, true);
+        const settings = DB.getSettings();
+        if (!settings.smtpHost || !settings.smtpUser || !settings.smtpPass) {
+            showToast('Önce Ayarlar sayfasından SMTP mail ayarlarını yapınız!', 'error');
+            return;
         }
 
         // Add accept link info
@@ -1385,10 +1386,49 @@ function executeSend() {
             body += '\nTeklif No: ' + p.proposalNo;
         }
 
-        const mailtoUrl = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        window.open(mailtoUrl, '_blank');
+        // Gönder butonunu devre dışı bırak
+        const sendBtn = document.querySelector('#sendModal .btn-success');
+        if (sendBtn) {
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gönderiliyor...';
+        }
 
-        showToast('E-posta istemciniz açıldı. PDF dosyasını ek olarak ekleyiniz.', 'info');
+        try {
+            const response = await fetch(API_BASE + '/send-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    to,
+                    subject,
+                    body,
+                    smtpHost: settings.smtpHost,
+                    smtpPort: settings.smtpPort || '587',
+                    smtpUser: settings.smtpUser,
+                    smtpPass: settings.smtpPass,
+                    fromName: settings.companyName || settings.smtpUser
+                })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                showToast('E-posta başarıyla gönderildi!', 'success');
+
+                // PDF indir
+                if (document.getElementById('sendPdfAttach').checked && p) {
+                    generateProposalPDF(p, true);
+                    showToast('PDF indirildi, gerekirse e-postaya manuel ekleyebilirsiniz.', 'info');
+                }
+            } else {
+                showToast('E-posta gönderilemedi: ' + result.error, 'error');
+            }
+        } catch (err) {
+            showToast('E-posta gönderme hatası: ' + err.message, 'error');
+        } finally {
+            if (sendBtn) {
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Gönder';
+            }
+        }
     } else {
         const phone = document.getElementById('sendWhatsappPhone').value.replace(/[\s()-+]/g, '');
         let msg = document.getElementById('sendWhatsappMsg').value;
@@ -1795,6 +1835,10 @@ function loadSettings() {
     if (s.fax) document.getElementById('settFax').value = s.fax;
     if (s.website) document.getElementById('settWebsite').value = s.website;
     if (s.email) document.getElementById('settEmail').value = s.email;
+    if (s.smtpHost) document.getElementById('settSmtpHost').value = s.smtpHost;
+    if (s.smtpPort) document.getElementById('settSmtpPort').value = s.smtpPort;
+    if (s.smtpUser) document.getElementById('settSmtpUser').value = s.smtpUser;
+    if (s.smtpPass) document.getElementById('settSmtpPass').value = s.smtpPass;
     if (s.emailSubject) document.getElementById('settEmailSubject').value = s.emailSubject;
     if (s.emailBody) document.getElementById('settEmailBody').value = s.emailBody;
     if (s.pdfNotes) document.getElementById('settPdfNotes').value = s.pdfNotes;
@@ -1808,6 +1852,10 @@ function saveSettings() {
         fax: document.getElementById('settFax').value,
         website: document.getElementById('settWebsite').value,
         email: document.getElementById('settEmail').value,
+        smtpHost: document.getElementById('settSmtpHost').value,
+        smtpPort: document.getElementById('settSmtpPort').value,
+        smtpUser: document.getElementById('settSmtpUser').value,
+        smtpPass: document.getElementById('settSmtpPass').value,
         emailSubject: document.getElementById('settEmailSubject').value,
         emailBody: document.getElementById('settEmailBody').value,
         pdfNotes: document.getElementById('settPdfNotes').value
@@ -1887,6 +1935,8 @@ function closeModal(id) {
 
 document.addEventListener('click', (e) => {
     if (e.target.classList.contains('modal-overlay')) {
+        // sendModal ve confirmModal dışarı tıklamayla kapanmasın
+        if (e.target.id === 'sendModal' || e.target.id === 'confirmModal') return;
         e.target.classList.remove('show');
     }
 });

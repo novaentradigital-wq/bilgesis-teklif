@@ -634,7 +634,36 @@
 
                 <div class="card">
                     <div class="card-header">
-                        <h3><i class="fas fa-envelope"></i> E-posta Ayarları</h3>
+                        <h3><i class="fas fa-server"></i> SMTP / Mail Sunucu Ayarları</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>SMTP Sunucu</label>
+                                <input type="text" id="settSmtpHost" placeholder="smtp.gmail.com">
+                            </div>
+                            <div class="form-group">
+                                <label>SMTP Port</label>
+                                <input type="number" id="settSmtpPort" placeholder="587" value="587">
+                            </div>
+                            <div class="form-group">
+                                <label>Gönderen E-posta</label>
+                                <input type="email" id="settSmtpUser" placeholder="firma@gmail.com">
+                            </div>
+                            <div class="form-group">
+                                <label>E-posta Şifresi / Uygulama Şifresi</label>
+                                <input type="password" id="settSmtpPass" placeholder="••••••••">
+                            </div>
+                        </div>
+                        <div class="info-box" style="margin-top:12px; padding:12px; background:var(--bg-light); border-radius:8px; font-size:13px; color:var(--text-muted);">
+                            <i class="fas fa-info-circle"></i> Gmail için: Google Hesabı → Güvenlik → 2 Adımlı Doğrulama açın → Uygulama Şifreleri bölümünden bir şifre oluşturun.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-envelope"></i> E-posta Şablonları</h3>
                     </div>
                     <div class="card-body">
                         <div class="form-grid">
