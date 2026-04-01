@@ -39,16 +39,15 @@ const DB = {
         try {
             const endpoints = { proposals: '/proposals', customers: '/customers', products: '/products', users: '/users' };
             const promises = Object.entries(endpoints).map(async ([key, path]) => {
-                const resp = await fetch(API_BASE + path);
+                const resp = await fetch(API_BASE + path, { headers: getAuthHeaders() });
                 if (resp.ok) {
                     const data = await resp.json();
                     _cache[key] = data;
                     localStorage.setItem('bilgesis_' + key, JSON.stringify(data));
                 }
             });
-            // Ayarları da çek
             promises.push((async () => {
-                const resp = await fetch(API_BASE + '/settings');
+                const resp = await fetch(API_BASE + '/settings', { headers: getAuthHeaders() });
                 if (resp.ok) {
                     const data = await resp.json();
                     _cache._settings = data;
@@ -62,18 +61,15 @@ const DB = {
         }
     },
 
-    // Tek bir collection'ı sunucuya kaydet
     async _syncToServer(key, data) {
         try {
             const endpoints = { proposals: '/proposals', customers: '/customers', products: '/products', users: '/users' };
             const path = endpoints[key];
             if (!path) return;
-
-            // Her öğeyi tek tek upsert et
             for (const item of data) {
                 await fetch(API_BASE + path, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify(item)
                 });
             }
@@ -82,13 +78,12 @@ const DB = {
         }
     },
 
-    // Silinen öğeyi sunucudan da sil
     async deleteFromServer(key, id) {
         try {
             const endpoints = { proposals: '/proposals', customers: '/customers', products: '/products', users: '/users' };
             const path = endpoints[key];
             if (!path) return;
-            await fetch(API_BASE + path + '/' + id, { method: 'DELETE' });
+            await fetch(API_BASE + path + '/' + id, { method: 'DELETE', headers: getAuthHeaders() });
         } catch (err) {
             console.warn('Sunucu silme hatası:', err.message);
         }
@@ -98,7 +93,7 @@ const DB = {
         try {
             await fetch(API_BASE + '/settings', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(data)
             });
         } catch (err) {
@@ -134,6 +129,15 @@ function setCurrentUser(user) {
     sessionStorage.setItem('bilgesis_user', JSON.stringify(user));
 }
 
+let _authToken = sessionStorage.getItem('bilgesis_token') || '';
+
+function getAuthHeaders() {
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + _authToken
+    };
+}
+
 async function handleLogin(e) {
     e.preventDefault();
     const username = document.getElementById('loginUsername').value.trim();
@@ -141,7 +145,6 @@ async function handleLogin(e) {
     const errEl = document.getElementById('loginError');
 
     try {
-        // Önce API'den dene
         const resp = await fetch(API_BASE + '/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -149,6 +152,8 @@ async function handleLogin(e) {
         });
         const result = await resp.json();
         if (result.success) {
+            _authToken = result.token || '';
+            sessionStorage.setItem('bilgesis_token', _authToken);
             setCurrentUser(result.user);
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('appWrapper').style.display = 'flex';
@@ -158,18 +163,7 @@ async function handleLogin(e) {
         errEl.textContent = result.message || 'Kullanıcı adı veya şifre hatalı!';
         errEl.style.display = 'block';
     } catch (err) {
-        // API yoksa localStorage'dan dene (offline mod)
-        console.warn('API bağlantısı yok, localStorage kullanılıyor');
-        const users = getUsers();
-        const user = users.find(u => u.username === username && u.password === password);
-        if (user) {
-            setCurrentUser(user);
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('appWrapper').style.display = 'flex';
-            initApp();
-            return false;
-        }
-        errEl.textContent = 'Kullanıcı adı veya şifre hatalı!';
+        errEl.textContent = 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.';
         errEl.style.display = 'block';
     }
     return false;
@@ -1411,7 +1405,7 @@ async function executeSend() {
         try {
             const response = await fetch(API_BASE + '/send-email', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify({
                     to,
                     subject,

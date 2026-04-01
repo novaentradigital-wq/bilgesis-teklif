@@ -17,9 +17,72 @@ const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Şifre hashleme (bcrypt yerine native crypto - ek bağımlılık gerektirmez)
+function hashPassword(password) {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+    return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, stored) {
+    if (!stored.includes(':')) return password === stored; // eski plaintext uyumu
+    const [salt, hash] = stored.split(':');
+    const verify = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+    return hash === verify;
+}
+
+// JWT benzeri token (basit, ek bağımlılık gerektirmez)
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
+
+function generateToken(user) {
+    const payload = JSON.stringify({ id: user.id, role: user.role, exp: Date.now() + 24 * 60 * 60 * 1000 });
+    const signature = crypto.createHmac('sha256', JWT_SECRET).update(payload).digest('hex');
+    return Buffer.from(payload).toString('base64') + '.' + signature;
+}
+
+function verifyToken(token) {
+    try {
+        const [payloadB64, signature] = token.split('.');
+        const payload = Buffer.from(payloadB64, 'base64').toString();
+        const expected = crypto.createHmac('sha256', JWT_SECRET).update(payload).digest('hex');
+        if (signature !== expected) return null;
+        const data = JSON.parse(payload);
+        if (data.exp < Date.now()) return null;
+        return data;
+    } catch { return null; }
+}
+
+// Auth middleware
+function authMiddleware(req, res, next) {
+    const auth = req.headers.authorization;
+    if (!auth || !auth.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Yetkilendirme gerekli' });
+    }
+    const user = verifyToken(auth.slice(7));
+    if (!user) return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token' });
+    req.user = user;
+    next();
+}
+
+// Rate limiter (basit, ek bağımlılık gerektirmez)
+const loginAttempts = new Map();
+function loginRateLimit(req, res, next) {
+    const ip = req.ip;
+    const now = Date.now();
+    const attempts = loginAttempts.get(ip) || [];
+    const recent = attempts.filter(t => now - t < 15 * 60 * 1000); // son 15 dk
+    if (recent.length >= 10) {
+        return res.status(429).json({ error: 'Çok fazla giriş denemesi. 15 dakika bekleyin.' });
+    }
+    recent.push(now);
+    loginAttempts.set(ip, recent);
+    next();
+}
 
 // PostgreSQL bağlantısı
 const pool = new Pool({
@@ -117,6 +180,13 @@ async function initDatabase() {
             CREATE INDEX IF NOT EXISTS idx_proposals_date ON proposals(date);
             CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
         `);
+        // Admin şifresini hashle (plaintext ise)
+        const adminRow = await pool.query('SELECT password FROM users WHERE id = $1', ['admin1']);
+        if (adminRow.rows.length > 0 && !adminRow.rows[0].password.includes(':')) {
+            const hashed = hashPassword(adminRow.rows[0].password);
+            await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashed, 'admin1']);
+            console.log('✓ Admin şifresi hashlendi');
+        }
         console.log('✓ Veritabanı tabloları hazır');
     } catch (err) {
         console.error('Veritabanı init hatası:', err.message);
@@ -124,8 +194,20 @@ async function initDatabase() {
 }
 
 // Middleware
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(cors({
+    origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
+    credentials: true
+}));
+app.use(express.json({ limit: '2mb' }));
+
+// Güvenlik başlıkları
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
+});
 
 // Statik dosyalar (frontend) - hem lokal hem Docker uyumlu
 const frontendPath = fs.existsSync(path.join(__dirname, 'uygulama'))
@@ -134,68 +216,81 @@ const frontendPath = fs.existsSync(path.join(__dirname, 'uygulama'))
 app.use(express.static(frontendPath));
 
 // ============ AUTH ============
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', loginRateLimit, async (req, res) => {
     try {
         const { username, password } = req.body;
+        if (!username || !password) {
+            return res.status(400).json({ success: false, message: 'Kullanıcı adı ve şifre gerekli' });
+        }
         const result = await pool.query(
-            'SELECT id, name, username, role, email FROM users WHERE username = $1 AND password = $2',
-            [username, password]
+            'SELECT id, name, username, password, role, email FROM users WHERE username = $1',
+            [username]
         );
-        if (result.rows.length > 0) {
-            res.json({ success: true, user: result.rows[0] });
+        if (result.rows.length > 0 && verifyPassword(password, result.rows[0].password)) {
+            const user = { id: result.rows[0].id, name: result.rows[0].name, username: result.rows[0].username, role: result.rows[0].role, email: result.rows[0].email };
+            const token = generateToken(user);
+            res.json({ success: true, user, token });
         } else {
             res.json({ success: false, message: 'Kullanıcı adı veya şifre hatalı!' });
         }
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+        console.error('Login hatası:', err.message);
+        res.status(500).json({ success: false, message: 'Sunucu hatası' });
     }
 });
 
 // ============ USERS ============
-app.get('/api/users', async (req, res) => {
+app.get('/api/users', authMiddleware, async (req, res) => {
     try {
         const result = await pool.query('SELECT id, name, username, role, email FROM users ORDER BY name');
         res.json(result.rows);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('Users GET hatası:', err.message);
+        res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
 
-app.post('/api/users', async (req, res) => {
+app.post('/api/users', authMiddleware, async (req, res) => {
     try {
         const { id, name, username, password, role, email } = req.body;
+        if (!name || !username || !password) {
+            return res.status(400).json({ error: 'Ad, kullanıcı adı ve şifre gerekli' });
+        }
+        const hashedPass = password.includes(':') ? password : hashPassword(password);
         await pool.query(
             'INSERT INTO users (id, name, username, password, role, email) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (id) DO UPDATE SET name=$2, username=$3, password=$4, role=$5, email=$6',
-            [id, name, username, password, role, email || '']
+            [id, name, username, hashedPass, role, email || '']
         );
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('Users POST hatası:', err.message);
+        res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
 
-app.delete('/api/users/:id', async (req, res) => {
+app.delete('/api/users/:id', authMiddleware, async (req, res) => {
     try {
         await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('Users DELETE hatası:', err.message);
+        res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
 
 // ============ PROPOSALS ============
-app.get('/api/proposals', async (req, res) => {
+app.get('/api/proposals', authMiddleware, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM proposals ORDER BY created_at ASC');
         // Frontend uyumluluğu için camelCase'e çevir
         const proposals = result.rows.map(rowToProposal);
         res.json(proposals);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error(err.message); res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
 
-app.post('/api/proposals', async (req, res) => {
+app.post('/api/proposals', authMiddleware, async (req, res) => {
     try {
         const p = req.body;
         await pool.query(`
@@ -208,21 +303,21 @@ app.post('/api/proposals', async (req, res) => {
         ]);
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error(err.message); res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
 
-app.delete('/api/proposals/:id', async (req, res) => {
+app.delete('/api/proposals/:id', authMiddleware, async (req, res) => {
     try {
         await pool.query('DELETE FROM proposals WHERE id = $1', [req.params.id]);
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error(err.message); res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
 
 // ============ CUSTOMERS ============
-app.get('/api/customers', async (req, res) => {
+app.get('/api/customers', authMiddleware, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM customers ORDER BY name');
         const customers = result.rows.map(row => ({
@@ -238,11 +333,11 @@ app.get('/api/customers', async (req, res) => {
         }));
         res.json(customers);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error(err.message); res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
 
-app.post('/api/customers', async (req, res) => {
+app.post('/api/customers', authMiddleware, async (req, res) => {
     try {
         const c = req.body;
         await pool.query(
@@ -253,21 +348,21 @@ app.post('/api/customers', async (req, res) => {
         );
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error(err.message); res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
 
-app.delete('/api/customers/:id', async (req, res) => {
+app.delete('/api/customers/:id', authMiddleware, async (req, res) => {
     try {
         await pool.query('DELETE FROM customers WHERE id = $1', [req.params.id]);
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error(err.message); res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
 
 // ============ PRODUCTS ============
-app.get('/api/products', async (req, res) => {
+app.get('/api/products', authMiddleware, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM products ORDER BY name');
         const products = result.rows.map(row => ({
@@ -279,11 +374,11 @@ app.get('/api/products', async (req, res) => {
         }));
         res.json(products);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error(err.message); res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
 
-app.post('/api/products', async (req, res) => {
+app.post('/api/products', authMiddleware, async (req, res) => {
     try {
         const p = req.body;
         await pool.query(
@@ -294,21 +389,21 @@ app.post('/api/products', async (req, res) => {
         );
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error(err.message); res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
 
-app.delete('/api/products/:id', async (req, res) => {
+app.delete('/api/products/:id', authMiddleware, async (req, res) => {
     try {
         await pool.query('DELETE FROM products WHERE id = $1', [req.params.id]);
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error(err.message); res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
 
 // ============ SETTINGS ============
-app.get('/api/settings', async (req, res) => {
+app.get('/api/settings', authMiddleware, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM settings');
         const settings = {};
@@ -317,11 +412,11 @@ app.get('/api/settings', async (req, res) => {
         });
         res.json(settings);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error(err.message); res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
 
-app.post('/api/settings', async (req, res) => {
+app.post('/api/settings', authMiddleware, async (req, res) => {
     try {
         const settings = req.body;
         for (const [key, value] of Object.entries(settings)) {
@@ -332,7 +427,7 @@ app.post('/api/settings', async (req, res) => {
         }
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error(err.message); res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
 
@@ -378,7 +473,7 @@ function rowToProposal(row) {
 // ============ E-POSTA GÖNDERME ============
 const nodemailer = require('nodemailer');
 
-app.post('/api/send-email', async (req, res) => {
+app.post('/api/send-email', authMiddleware, async (req, res) => {
     try {
         const { to, subject, body, smtpHost, smtpPort, smtpUser, smtpPass, fromName } = req.body;
 
