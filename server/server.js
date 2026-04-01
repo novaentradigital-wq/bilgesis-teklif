@@ -75,9 +75,9 @@ function loginRateLimit(req, res, next) {
     const ip = req.ip;
     const now = Date.now();
     const attempts = loginAttempts.get(ip) || [];
-    const recent = attempts.filter(t => now - t < 15 * 60 * 1000); // son 15 dk
-    if (recent.length >= 10) {
-        return res.status(429).json({ error: 'Çok fazla giriş denemesi. 15 dakika bekleyin.' });
+    const recent = attempts.filter(t => now - t < 5 * 60 * 1000); // son 5 dk
+    if (recent.length >= 20) {
+        return res.status(429).json({ error: 'Çok fazla giriş denemesi. 5 dakika bekleyin.' });
     }
     recent.push(now);
     loginAttempts.set(ip, recent);
