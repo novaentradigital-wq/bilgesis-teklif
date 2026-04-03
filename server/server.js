@@ -147,6 +147,9 @@ function apiRateLimit(req, res, next) {
 }
 
 // Input doğrulama yardımcıları
+function validateId(val) {
+    return typeof val === 'string' && val.length <= 50 && /^[a-zA-Z0-9_\-]+$/.test(val);
+}
 function validateString(val, maxLen = 500) {
     return typeof val === 'string' && val.length <= maxLen;
 }
@@ -414,6 +417,9 @@ app.get('/api/proposals', authMiddleware, async (req, res) => {
 app.post('/api/proposals', authMiddleware, async (req, res) => {
     try {
         const p = req.body;
+        if (p.id && !validateId(p.id)) {
+            return res.status(400).json({ error: 'Geçersiz ID formatı' });
+        }
         // Güvenlik: status değerini doğrula
         const allowedStatuses = ['taslak', 'gönderildi', 'kabul', 'red'];
         const safeStatus = allowedStatuses.includes(p.status) ? p.status : 'taslak';
@@ -468,6 +474,9 @@ app.get('/api/customers', authMiddleware, async (req, res) => {
 app.post('/api/customers', authMiddleware, async (req, res) => {
     try {
         const c = req.body;
+        if (c.id && !validateId(c.id)) {
+            return res.status(400).json({ error: 'Geçersiz ID formatı' });
+        }
         if (!c.name || !validateString(c.name, 300)) {
             return res.status(400).json({ error: 'Geçerli bir müşteri adı gerekli' });
         }
@@ -515,6 +524,9 @@ app.get('/api/products', authMiddleware, async (req, res) => {
 app.post('/api/products', authMiddleware, async (req, res) => {
     try {
         const p = req.body;
+        if (p.id && !validateId(p.id)) {
+            return res.status(400).json({ error: 'Geçersiz ID formatı' });
+        }
         if (!p.name || !validateString(p.name, 300)) {
             return res.status(400).json({ error: 'Geçerli bir ürün adı gerekli' });
         }

@@ -472,7 +472,7 @@ function renderDashboardReminders() {
                 <strong>${escapeHtml(p.customerName)}</strong> - ${escapeHtml(p.proposalNo)} - ${formatMoney(p.grandTotal)} ${getCurrencySymbol(p.currency)}
                 <small>${label} | ${formatDate(p.reminderDate)} | ${callInfo}</small>
             </div>
-            <button class="btn btn-xs btn-primary" onclick="openCallResultModal('${p.id}')"><i class="fas fa-phone"></i> Sonuç Gir</button>
+            <button class="btn btn-xs btn-primary" onclick="openCallResultModal('${escapeHtml(p.id)}')"><i class="fas fa-phone"></i> Sonuç Gir</button>
         </div>`;
     }).join('');
 }
@@ -599,14 +599,14 @@ function renderReminders() {
         // Butonlar
         const canAct = !isCompleted;
         const actionsHtml = canAct ? `
-            <button class="btn btn-sm btn-primary" onclick="openCallResultModal('${p.id}')"><i class="fas fa-phone"></i> Görüşme Sonucu Gir</button>
-            <button class="btn btn-sm btn-success" onclick="updateProposalStatus('${p.id}','kabul')"><i class="fas fa-check"></i> Kabul</button>
-            <button class="btn btn-sm btn-danger" onclick="updateProposalStatus('${p.id}','red')"><i class="fas fa-times"></i> Red</button>
-            <button class="btn btn-sm btn-outline" onclick="openSendModal('${p.id}')" style="color:var(--info);border-color:var(--info)"><i class="fas fa-share-alt"></i> Gönder</button>
-            <button class="btn btn-sm btn-outline" onclick="openReminderDetail('${p.id}')" style="color:var(--secondary);border-color:var(--secondary)"><i class="fas fa-eye"></i> Detay</button>
+            <button class="btn btn-sm btn-primary" onclick="openCallResultModal('${escapeHtml(p.id)}')"><i class="fas fa-phone"></i> Görüşme Sonucu Gir</button>
+            <button class="btn btn-sm btn-success" onclick="updateProposalStatus('${escapeHtml(p.id)}','kabul')"><i class="fas fa-check"></i> Kabul</button>
+            <button class="btn btn-sm btn-danger" onclick="updateProposalStatus('${escapeHtml(p.id)}','red')"><i class="fas fa-times"></i> Red</button>
+            <button class="btn btn-sm btn-outline" onclick="openSendModal('${escapeHtml(p.id)}')" style="color:var(--info);border-color:var(--info)"><i class="fas fa-share-alt"></i> Gönder</button>
+            <button class="btn btn-sm btn-outline" onclick="openReminderDetail('${escapeHtml(p.id)}')" style="color:var(--secondary);border-color:var(--secondary)"><i class="fas fa-eye"></i> Detay</button>
         ` : `
-            <button class="btn btn-sm btn-outline" onclick="openReminderDetail('${p.id}')" style="color:var(--secondary);border-color:var(--secondary)"><i class="fas fa-eye"></i> Detay</button>
-            <button class="btn btn-sm btn-outline" onclick="viewProposalPDF('${p.id}')"><i class="fas fa-file-pdf"></i> PDF</button>
+            <button class="btn btn-sm btn-outline" onclick="openReminderDetail('${escapeHtml(p.id)}')" style="color:var(--secondary);border-color:var(--secondary)"><i class="fas fa-eye"></i> Detay</button>
+            <button class="btn btn-sm btn-outline" onclick="viewProposalPDF('${escapeHtml(p.id)}')"><i class="fas fa-file-pdf"></i> PDF</button>
         `;
 
         return `
@@ -738,7 +738,7 @@ function openReminderDetail(proposalId) {
     const isCompleted = p.reminderCompleted || p.status === 'kabul' || p.status === 'red';
     document.getElementById('rdFooter').innerHTML = `
         <button class="btn btn-outline" onclick="closeModal('reminderDetailModal')">Kapat</button>
-        <button class="btn btn-primary" onclick="viewProposalPDF('${p.id}')"><i class="fas fa-file-pdf"></i> PDF Görüntüle</button>
+        <button class="btn btn-primary" onclick="viewProposalPDF('${escapeHtml(p.id)}')"><i class="fas fa-file-pdf"></i> PDF Görüntüle</button>
         ${!isCompleted ? `<button class="btn btn-success" onclick="closeModal('reminderDetailModal');openCallResultModal('${p.id}')"><i class="fas fa-phone"></i> Görüşme Gir</button>` : ''}
         <button class="btn btn-info" onclick="closeModal('reminderDetailModal');openSendModal('${p.id}')"><i class="fas fa-share-alt"></i> Gönder</button>
     `;
@@ -754,7 +754,7 @@ function getCallStatusText(status) {
         'kabul': 'Teklif Kabul Edildi',
         'red': 'Teklif Reddedildi'
     };
-    return map[status] || status;
+    return map[status] || escapeHtml(status);
 }
 
 function formatDateTime(dateStr) {
@@ -1152,24 +1152,24 @@ function renderProposals() {
             <td><span class="status-badge status-${escapeHtml(p.status)}">${escapeHtml(getStatusText(p.status))}</span></td>
             <td>
                 <div class="action-buttons">
-                    <button class="btn btn-xs btn-primary" onclick="viewProposalPDF('${p.id}')" title="PDF Görüntüle">
+                    <button class="btn btn-xs btn-primary" onclick="viewProposalPDF('${escapeHtml(p.id)}')" title="PDF Görüntüle">
                         <i class="fas fa-file-pdf"></i>
                     </button>
-                    <button class="btn btn-xs btn-outline" onclick="editProposal('${p.id}')" title="Düzenle">
+                    <button class="btn btn-xs btn-outline" onclick="editProposal('${escapeHtml(p.id)}')" title="Düzenle">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="btn btn-xs btn-outline" onclick="openSendModal('${p.id}')" title="Gönder" style="color:var(--info);border-color:var(--info)">
+                    <button class="btn btn-xs btn-outline" onclick="openSendModal('${escapeHtml(p.id)}')" title="Gönder" style="color:var(--info);border-color:var(--info)">
                         <i class="fas fa-share-alt"></i>
                     </button>
                     ${p.status !== 'kabul' ? `
-                    <button class="btn btn-xs btn-outline" onclick="updateProposalStatus('${p.id}','kabul')" title="Kabul Et" style="color:var(--success);border-color:var(--success)">
+                    <button class="btn btn-xs btn-outline" onclick="updateProposalStatus('${escapeHtml(p.id)}','kabul')" title="Kabul Et" style="color:var(--success);border-color:var(--success)">
                         <i class="fas fa-check"></i>
                     </button>` : ''}
                     ${p.status !== 'red' ? `
-                    <button class="btn btn-xs btn-outline" onclick="updateProposalStatus('${p.id}','red')" title="Reddet" style="color:var(--danger);border-color:var(--danger)">
+                    <button class="btn btn-xs btn-outline" onclick="updateProposalStatus('${escapeHtml(p.id)}','red')" title="Reddet" style="color:var(--danger);border-color:var(--danger)">
                         <i class="fas fa-times"></i>
                     </button>` : ''}
-                    ${getCurrentUser() && getCurrentUser().role === 'admin' ? `<button class="btn btn-xs btn-danger" onclick="deleteProposal('${p.id}')" title="Sil">
+                    ${getCurrentUser() && getCurrentUser().role === 'admin' ? `<button class="btn btn-xs btn-danger" onclick="deleteProposal('${escapeHtml(p.id)}')" title="Sil">
                         <i class="fas fa-trash"></i>
                     </button>` : ''}
                 </div>
@@ -1530,10 +1530,10 @@ function renderCustomers() {
             <td>${count}</td>
             <td>
                 <div class="action-buttons">
-                    <button class="btn btn-xs btn-outline" onclick="editCustomer('${c.id}')" title="Düzenle">
+                    <button class="btn btn-xs btn-outline" onclick="editCustomer('${escapeHtml(c.id)}')" title="Düzenle">
                         <i class="fas fa-edit"></i>
                     </button>
-                    ${getCurrentUser() && getCurrentUser().role === 'admin' ? `<button class="btn btn-xs btn-danger" onclick="deleteCustomer('${c.id}')" title="Sil">
+                    ${getCurrentUser() && getCurrentUser().role === 'admin' ? `<button class="btn btn-xs btn-danger" onclick="deleteCustomer('${escapeHtml(c.id)}')" title="Sil">
                         <i class="fas fa-trash"></i>
                     </button>` : ''}
                 </div>
@@ -1657,10 +1657,10 @@ function renderProducts() {
             <td>${escapeHtml(p.currency)}</td>
             <td>
                 <div class="action-buttons">
-                    <button class="btn btn-xs btn-outline" onclick="editProduct('${p.id}')" title="Düzenle">
+                    <button class="btn btn-xs btn-outline" onclick="editProduct('${escapeHtml(p.id)}')" title="Düzenle">
                         <i class="fas fa-edit"></i>
                     </button>
-                    ${getCurrentUser() && getCurrentUser().role === 'admin' ? `<button class="btn btn-xs btn-danger" onclick="deleteProduct('${p.id}')" title="Sil">
+                    ${getCurrentUser() && getCurrentUser().role === 'admin' ? `<button class="btn btn-xs btn-danger" onclick="deleteProduct('${escapeHtml(p.id)}')" title="Sil">
                         <i class="fas fa-trash"></i>
                     </button>` : ''}
                 </div>
@@ -1760,11 +1760,11 @@ function renderPersonnel() {
             <td>${escapeHtml(u.email || '-')}</td>
             <td>
                 <div class="action-buttons">
-                    <button class="btn btn-xs btn-outline" onclick="editPersonnel('${u.id}')" title="Düzenle">
+                    <button class="btn btn-xs btn-outline" onclick="editPersonnel('${escapeHtml(u.id)}')" title="Düzenle">
                         <i class="fas fa-edit"></i>
                     </button>
                     ${u.username !== 'admin' ? `
-                    <button class="btn btn-xs btn-danger" onclick="deletePersonnel('${u.id}')" title="Sil">
+                    <button class="btn btn-xs btn-danger" onclick="deletePersonnel('${escapeHtml(u.id)}')" title="Sil">
                         <i class="fas fa-trash"></i>
                     </button>` : ''}
                 </div>
@@ -1945,7 +1945,7 @@ function formatDate(dateStr) {
 
 function getCurrencySymbol(currency) {
     const symbols = { 'USD': '$', 'EUR': '€', 'TL': '₺' };
-    return symbols[currency] || currency;
+    return symbols[currency] || escapeHtml(currency);
 }
 
 function getStatusText(status) {
