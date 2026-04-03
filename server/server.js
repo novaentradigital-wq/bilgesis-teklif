@@ -584,9 +584,20 @@ app.post('/api/send-email', authMiddleware, async (req, res) => {
         };
 
         if (pdfBase64 && pdfFilename) {
+            // Güvenlik: dosya adını temizle (sadece harf, rakam, tire, alt çizgi, nokta)
+            const safeName = String(pdfFilename).replace(/[^a-zA-Z0-9_\-\.]/g, '_').substring(0, 100);
+            // Güvenlik: base64 formatını doğrula
+            if (!/^[A-Za-z0-9+/=]+$/.test(pdfBase64)) {
+                return res.status(400).json({ error: 'Geçersiz PDF verisi.' });
+            }
+            // Güvenlik: PDF boyut kontrolü (max 5MB)
+            const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+            if (pdfBuffer.length > 5 * 1024 * 1024) {
+                return res.status(400).json({ error: 'PDF dosyası çok büyük (max 5MB).' });
+            }
             mailOptions.attachments = [{
-                filename: pdfFilename,
-                content: Buffer.from(pdfBase64, 'base64'),
+                filename: safeName,
+                content: pdfBuffer,
                 contentType: 'application/pdf'
             }];
         }
