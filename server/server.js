@@ -178,21 +178,21 @@ async function initDatabase() {
             CREATE INDEX IF NOT EXISTS idx_proposals_date ON proposals(date);
             CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
         `);
-        // Admin kullanıcısını oluştur (yoksa)
+        // Admin kullanıcısını oluştur veya şifresini güncelle
+        const adminPass = process.env.ADMIN_PASSWORD;
         const adminRow = await pool.query('SELECT id, password FROM users WHERE id = $1', ['admin1']);
         if (adminRow.rows.length === 0) {
-            const adminPass = process.env.ADMIN_PASSWORD || 'degistir123';
-            const hashed = hashPassword(adminPass);
+            const hashed = hashPassword(adminPass || 'degistir123');
             await pool.query(
                 'INSERT INTO users (id, name, username, password, role, email) VALUES ($1,$2,$3,$4,$5,$6)',
                 ['admin1', 'Yönetici', 'admin', hashed, 'admin', '']
             );
-            console.log('✓ Admin kullanıcısı oluşturuldu (şifreyi .env dosyasından alıyor)');
-        } else if (!adminRow.rows[0].password.includes(':')) {
-            // Eski plaintext şifreyi hashle
-            const hashed = hashPassword(adminRow.rows[0].password);
+            console.log('✓ Admin kullanıcısı oluşturuldu');
+        } else if (adminPass) {
+            // ADMIN_PASSWORD env varsa her zaman güncelle
+            const hashed = hashPassword(adminPass);
             await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashed, 'admin1']);
-            console.log('✓ Admin şifresi hashlendi');
+            console.log('✓ Admin şifresi güncellendi');
         }
         console.log('✓ Veritabanı tabloları hazır');
     } catch (err) {
