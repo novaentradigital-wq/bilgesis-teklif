@@ -18,13 +18,16 @@ const DB = {
         // Önce cache'den oku (senkron)
         if (_cache[key]) return JSON.parse(JSON.stringify(_cache[key]));
         try {
-            return JSON.parse(localStorage.getItem('bilgesis_' + key)) || [];
+            // Güvenlik: users verisi sessionStorage'da tutulur
+            const storage = key === 'users' ? sessionStorage : localStorage;
+            return JSON.parse(storage.getItem('bilgesis_' + key)) || [];
         } catch { return []; }
     },
     set(key, data) {
-        // Hem local cache hem localStorage güncelle (senkron)
+        // Hem local cache hem storage güncelle (senkron)
         _cache[key] = data;
-        localStorage.setItem('bilgesis_' + key, JSON.stringify(data));
+        const storage = key === 'users' ? sessionStorage : localStorage;
+        storage.setItem('bilgesis_' + key, JSON.stringify(data));
         // Arka planda API'ye kaydet (asenkron)
         DB._syncToServer(key, data);
     },
@@ -49,7 +52,8 @@ const DB = {
                 if (resp.ok) {
                     const data = await resp.json();
                     _cache[key] = data;
-                    localStorage.setItem('bilgesis_' + key, JSON.stringify(data));
+                    const storage = key === 'users' ? sessionStorage : localStorage;
+                    storage.setItem('bilgesis_' + key, JSON.stringify(data));
                 }
             });
             promises.push((async () => {
@@ -411,7 +415,7 @@ function renderDashboard() {
             const repName = repUser ? repUser.name : (p.salesRep || '-');
             return `
             <tr>
-                <td><strong>${p.proposalNo}</strong></td>
+                <td><strong>${escapeHtml(p.proposalNo)}</strong></td>
                 <td>${escapeHtml(p.customerName)}</td>
                 <td style="font-size:0.82rem"><i class="fas fa-user" style="font-size:0.65rem;color:var(--text-muted);margin-right:2px"></i>${escapeHtml(repName)}</td>
                 <td><strong>${formatMoney(p.grandTotal)} ${getCurrencySymbol(p.currency)}</strong></td>
@@ -617,7 +621,7 @@ function renderReminders() {
             </div>
             <div class="rc-body">
                 <div class="rc-info-row">
-                    <div class="rc-info-item"><i class="fas fa-file-invoice"></i> <strong>${p.proposalNo}</strong></div>
+                    <div class="rc-info-item"><i class="fas fa-file-invoice"></i> <strong>${escapeHtml(p.proposalNo)}</strong></div>
                     <div class="rc-info-item"><i class="fas fa-money-bill"></i> <strong>${formatMoney(p.grandTotal)} ${getCurrencySymbol(p.currency)}</strong></div>
                     <div class="rc-info-item"><i class="fas fa-phone"></i> ${escapeHtml(p.customerPhone || '-')}</div>
                     <div class="rc-info-item"><i class="fas fa-envelope"></i> ${escapeHtml(p.customerEmail || '-')}</div>
@@ -886,9 +890,9 @@ function addProductRow(name = '', price = '', qty = 1) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
         <td class="row-number">${rowCount}</td>
-        <td><input type="text" placeholder="Ürün adı / açıklaması" value="${name}" class="prod-name" required></td>
-        <td><input type="number" placeholder="0,00" value="${price}" step="0.01" min="0" class="prod-price" oninput="calculateRow(this)"></td>
-        <td><input type="number" value="${qty}" min="1" class="prod-qty" oninput="calculateRow(this)"></td>
+        <td><input type="text" placeholder="Ürün adı / açıklaması" value="${escapeHtml(name)}" class="prod-name" required></td>
+        <td><input type="number" placeholder="0,00" value="${escapeHtml(String(price))}" step="0.01" min="0" class="prod-price" oninput="calculateRow(this)"></td>
+        <td><input type="number" value="${escapeHtml(String(qty))}" min="1" class="prod-qty" oninput="calculateRow(this)"></td>
         <td><input type="text" value="${price ? formatMoney(price * qty) : '0,00'}" class="prod-total" readonly style="background:#f5f5f5;font-weight:600"></td>
         <td><button type="button" class="btn-remove" onclick="removeProductRow(this)" title="Satırı Sil"><i class="fas fa-times"></i></button></td>
     `;
@@ -1135,7 +1139,7 @@ function renderProposals() {
         const repName = repUser ? repUser.name : (p.salesRep || '-');
         return `
         <tr>
-            <td><strong>${p.proposalNo}</strong></td>
+            <td><strong>${escapeHtml(p.proposalNo)}</strong></td>
             <td>
                 <div><strong>${escapeHtml(p.customerName)}</strong></div>
                 <div style="font-size:0.75rem;color:var(--text-muted)">${escapeHtml(p.contactPerson || '')}</div>
@@ -1284,7 +1288,7 @@ function showConfirmModal(opts) {
     if (opts.info) {
         let html = '';
         for (const key in opts.info) {
-            html += '<div class="info-row"><span>' + key + '</span><strong>' + opts.info[key] + '</strong></div>';
+            html += '<div class="info-row"><span>' + escapeHtml(key) + '</span><strong>' + escapeHtml(opts.info[key]) + '</strong></div>';
         }
         infoEl.innerHTML = html;
         infoEl.style.display = '';
@@ -1530,10 +1534,10 @@ function renderCustomers() {
         const count = proposals.filter(p => p.customerName === c.name).length;
         return `
         <tr>
-            <td><strong>${c.name}</strong></td>
-            <td>${c.contact || '-'}</td>
-            <td>${c.phone || '-'}</td>
-            <td>${c.email || '-'}</td>
+            <td><strong>${escapeHtml(c.name)}</strong></td>
+            <td>${escapeHtml(c.contact || '-')}</td>
+            <td>${escapeHtml(c.phone || '-')}</td>
+            <td>${escapeHtml(c.email || '-')}</td>
             <td>${count}</td>
             <td>
                 <div class="action-buttons">
@@ -1635,7 +1639,7 @@ function populateCustomerSelect() {
     const customers = DB.get('customers');
     select.innerHTML = '<option value="">Kayıtlı müşteri seçin...</option>';
     customers.forEach(c => {
-        select.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+        select.innerHTML += `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`;
     });
 }
 
@@ -1658,10 +1662,10 @@ function renderProducts() {
 
     tbody.innerHTML = filtered.map(p => `
         <tr>
-            <td><strong>${p.name}</strong></td>
-            <td>${p.category || '-'}</td>
+            <td><strong>${escapeHtml(p.name)}</strong></td>
+            <td>${escapeHtml(p.category || '-')}</td>
             <td>${formatMoney(p.price)} ${getCurrencySymbol(p.currency)}</td>
-            <td>${p.currency}</td>
+            <td>${escapeHtml(p.currency)}</td>
             <td>
                 <div class="action-buttons">
                     <button class="btn btn-xs btn-outline" onclick="editProduct('${p.id}')" title="Düzenle">
@@ -1750,7 +1754,7 @@ function populateProductSelect() {
     const products = DB.get('products');
     select.innerHTML = '<option value="">Kayıtlı ürün ekle...</option>';
     products.forEach(p => {
-        select.innerHTML += `<option value="${p.id}">${p.name} - ${formatMoney(p.price)} ${getCurrencySymbol(p.currency)}</option>`;
+        select.innerHTML += `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)} - ${formatMoney(p.price)} ${getCurrencySymbol(p.currency)}</option>`;
     });
 }
 
@@ -1761,10 +1765,10 @@ function renderPersonnel() {
 
     tbody.innerHTML = users.map(u => `
         <tr>
-            <td><strong>${u.name}</strong></td>
-            <td>${u.username}</td>
+            <td><strong>${escapeHtml(u.name)}</strong></td>
+            <td>${escapeHtml(u.username)}</td>
             <td><span class="status-badge ${u.role === 'admin' ? 'status-kabul' : 'status-gönderildi'}">${u.role === 'admin' ? 'Yönetici' : 'Personel'}</span></td>
-            <td>${u.email || '-'}</td>
+            <td>${escapeHtml(u.email || '-')}</td>
             <td>
                 <div class="action-buttons">
                     <button class="btn btn-xs btn-outline" onclick="editPersonnel('${u.id}')" title="Düzenle">
@@ -1989,7 +1993,7 @@ function showToast(message, type = 'info') {
         info: 'fa-info-circle'
     };
 
-    toast.innerHTML = `<i class="fas ${icons[type] || icons.info}"></i> ${message}`;
+    toast.innerHTML = `<i class="fas ${icons[type] || icons.info}"></i> ${escapeHtml(message)}`;
     container.appendChild(toast);
 
     setTimeout(() => {

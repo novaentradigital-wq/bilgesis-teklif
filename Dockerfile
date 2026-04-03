@@ -3,8 +3,8 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Server dosyalarını kopyala
-COPY server/package.json server/package-lock.json* ./
-RUN npm install --production
+COPY server/package.json server/package-lock.json ./
+RUN npm ci --production
 
 COPY server/server.js ./server.js
 

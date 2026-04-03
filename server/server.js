@@ -30,14 +30,26 @@ function hashPassword(password) {
 }
 
 function verifyPassword(password, stored) {
-    if (!stored.includes(':')) return password === stored; // eski plaintext uyumu
+    if (!stored || !stored.includes(':')) return false; // plaintext artık kabul edilmez
     const [salt, hash] = stored.split(':');
+    if (!salt || !hash) return false;
     const verify = crypto.pbkdf2Sync(password, salt, 310000, 64, 'sha512').toString('hex');
-    return hash === verify;
+    return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(verify, 'hex'));
 }
 
 // JWT benzeri token (basit, ek bağımlılık gerektirmez)
-const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
+// JWT_SECRET yoksa rastgele üretilir ve .env'ye kaydedilir
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    JWT_SECRET = crypto.randomBytes(32).toString('hex');
+    try {
+        const envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+        if (!envContent.includes('JWT_SECRET=')) {
+            fs.appendFileSync(envPath, `\nJWT_SECRET=${JWT_SECRET}\n`);
+            console.log('✓ JWT_SECRET oluşturuldu ve .env dosyasına kaydedildi');
+        }
+    } catch (e) { console.warn('JWT_SECRET .env dosyasına kaydedilemedi'); }
+}
 
 function generateToken(user) {
     const payload = JSON.stringify({ id: user.id, role: user.role, exp: Date.now() + 8 * 60 * 60 * 1000 });
@@ -64,7 +76,7 @@ function authMiddleware(req, res, next) {
         return res.status(401).json({ error: 'Yetkilendirme gerekli' });
     }
     const token = auth.slice(7);
-    if (tokenBlacklist.has(token)) return res.status(401).json({ error: 'Oturum sonlandırılmış' });
+    if (tokenBlacklist.has(token) && tokenBlacklist.get(token) > Date.now()) return res.status(401).json({ error: 'Oturum sonlandırılmış' });
     const user = verifyToken(token);
     if (!user) return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token' });
     req.user = user;
@@ -80,11 +92,32 @@ function adminOnly(req, res, next) {
     next();
 }
 
-// Token blacklist (logout desteği)
-const tokenBlacklist = new Set();
+// Token blacklist (logout desteği) - Map ile TTL takibi
+const tokenBlacklist = new Map();
+// Her 10 dakikada süresi dolmuş tokenları temizle
+setInterval(() => {
+    const now = Date.now();
+    for (const [token, exp] of tokenBlacklist) {
+        if (exp < now) tokenBlacklist.delete(token);
+    }
+}, 10 * 60 * 1000);
 
 // Rate limiter (basit, ek bağımlılık gerektirmez)
 const loginAttempts = new Map();
+// Rate limiter map temizliği (her 5 dakikada)
+setInterval(() => {
+    const now = Date.now();
+    for (const [ip, attempts] of loginAttempts) {
+        const recent = attempts.filter(t => now - t < 5 * 60 * 1000);
+        if (recent.length === 0) loginAttempts.delete(ip);
+        else loginAttempts.set(ip, recent);
+    }
+    for (const [ip, requests] of apiRequests) {
+        const recent = requests.filter(t => now - t < 60 * 1000);
+        if (recent.length === 0) apiRequests.delete(ip);
+        else apiRequests.set(ip, recent);
+    }
+}, 5 * 60 * 1000);
 function loginRateLimit(req, res, next) {
     const ip = req.ip;
     const now = Date.now();
@@ -221,9 +254,15 @@ async function initDatabase() {
         `);
         // Admin kullanıcısını oluştur veya şifresini güncelle
         const adminPass = process.env.ADMIN_PASSWORD;
+        if (!adminPass) {
+            console.warn('⚠ UYARI: ADMIN_PASSWORD ortam değişkeni ayarlanmamış! Güçlü bir şifre belirleyin.');
+        }
         const adminRow = await pool.query('SELECT id, password FROM users WHERE id = $1', ['admin1']);
         if (adminRow.rows.length === 0) {
-            const hashed = hashPassword(adminPass || 'degistir123');
+            // Fallback şifre yoksa rastgele güçlü şifre üret
+            const fallbackPass = adminPass || crypto.randomBytes(16).toString('hex');
+            if (!adminPass) console.warn('⚠ Otomatik admin şifresi: ' + fallbackPass);
+            const hashed = hashPassword(fallbackPass);
             await pool.query(
                 'INSERT INTO users (id, name, username, password, role, email) VALUES ($1,$2,$3,$4,$5,$6)',
                 ['admin1', 'Yönetici', 'admin', hashed, 'admin', '']
@@ -241,13 +280,18 @@ async function initDatabase() {
     }
 }
 
-// Middleware
+// Proxy arkasında gerçek IP'yi al (Coolify/nginx)
+app.set('trust proxy', 1);
+
+// Middleware - CORS: sadece aynı origin veya açıkça belirtilen domainler
 app.use(cors({
     origin: process.env.ALLOWED_ORIGINS
-        ? process.env.ALLOWED_ORIGINS.split(',')
+        ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
         : (origin, callback) => {
-            // Aynı sunucudan gelen isteklere izin ver (origin undefined = same-origin)
-            callback(null, origin || true);
+            // origin undefined = same-origin isteği (izin ver)
+            // origin tanımlı = cross-origin (reddet)
+            if (!origin) return callback(null, true);
+            callback(new Error('CORS izni yok'));
         },
     credentials: true
 }));
@@ -261,7 +305,10 @@ app.use((req, res, next) => {
     res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'");
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    // HSTS sadece HTTPS arkasındayken anlamlı
+    if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
     next();
 });
@@ -316,7 +363,7 @@ app.post('/api/users', authMiddleware, adminOnly, async (req, res) => {
         if (!validateString(name, 200) || !validateString(username, 100)) {
             return res.status(400).json({ error: 'Geçersiz ad veya kullanıcı adı' });
         }
-        if (!password.includes(':') && !validatePassword(password)) {
+        if (!validatePassword(password)) {
             return res.status(400).json({ error: 'Şifre en az 8 karakter olmalıdır' });
         }
         if (email && !validateEmail(email)) {
@@ -326,7 +373,8 @@ app.post('/api/users', authMiddleware, adminOnly, async (req, res) => {
         if (role && !allowedRoles.includes(role)) {
             return res.status(400).json({ error: 'Geçersiz rol' });
         }
-        const hashedPass = password.includes(':') ? password : hashPassword(password);
+        // Güvenlik: şifre her zaman sunucu tarafında hash'lenir
+        const hashedPass = hashPassword(password);
         await pool.query(
             'INSERT INTO users (id, name, username, password, role, email) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (id) DO UPDATE SET name=$2, username=$3, password=$4, role=$5, email=$6',
             [id, name, username, hashedPass, role || 'personel', email || '']
@@ -380,7 +428,7 @@ app.post('/api/proposals', authMiddleware, async (req, res) => {
     }
 });
 
-app.delete('/api/proposals/:id', authMiddleware, async (req, res) => {
+app.delete('/api/proposals/:id', authMiddleware, adminOnly, async (req, res) => {
     try {
         await pool.query('DELETE FROM proposals WHERE id = $1', [req.params.id]);
         res.json({ success: true });
@@ -431,7 +479,7 @@ app.post('/api/customers', authMiddleware, async (req, res) => {
     }
 });
 
-app.delete('/api/customers/:id', authMiddleware, async (req, res) => {
+app.delete('/api/customers/:id', authMiddleware, adminOnly, async (req, res) => {
     try {
         await pool.query('DELETE FROM customers WHERE id = $1', [req.params.id]);
         res.json({ success: true });
@@ -478,7 +526,7 @@ app.post('/api/products', authMiddleware, async (req, res) => {
     }
 });
 
-app.delete('/api/products/:id', authMiddleware, async (req, res) => {
+app.delete('/api/products/:id', authMiddleware, adminOnly, async (req, res) => {
     try {
         await pool.query('DELETE FROM products WHERE id = $1', [req.params.id]);
         res.json({ success: true });
@@ -613,7 +661,7 @@ app.post('/api/send-email', authMiddleware, async (req, res) => {
 
 // ============ LOGOUT ============
 app.post('/api/logout', authMiddleware, (req, res) => {
-    tokenBlacklist.add(req.token);
+    tokenBlacklist.set(req.token, Date.now() + 8 * 60 * 60 * 1000);
     res.json({ success: true });
 });
 
