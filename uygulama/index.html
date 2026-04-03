@@ -4,35 +4,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BİLGESİS - Teklif Yönetim Sistemi</title>
-    <link rel="stylesheet" href="css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { 50: '#ebf2fa', 100: '#c3d9f0', DEFAULT: '#1e3a5f', light: '#2c5282', dark: '#0f2340' },
+                        accent: { DEFAULT: '#475569', light: '#64748b', dark: '#334155' },
+                    },
+                    fontFamily: {
+                        sans: ['IBM Plex Sans', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body class="font-sans bg-slate-100 text-slate-900 antialiased min-h-screen overflow-x-hidden">
 
     <!-- ==================== GİRİŞ EKRANI ==================== -->
     <div class="login-screen" id="loginScreen">
         <div class="login-card">
-            <div class="login-header">
-                <div class="login-logo">
+            <div class="text-center mb-7">
+                <div class="w-14 h-14 bg-gradient-to-br from-primary to-primary-light rounded-2xl flex items-center justify-center mx-auto mb-4 text-white text-2xl shadow-lg shadow-primary/25">
                     <i class="fas fa-file-invoice-dollar"></i>
                 </div>
-                <h1>BİLGESİS</h1>
-                <p>Teklif Yönetim Sistemi</p>
+                <h1 class="text-2xl font-bold text-primary tracking-wide">BİLGESİS</h1>
+                <p class="text-sm text-slate-400 mt-0.5">Teklif Yönetim Sistemi</p>
             </div>
             <form id="loginForm" onsubmit="return handleLogin(event)">
-                <div class="form-group">
-                    <label><i class="fas fa-user"></i> Kullanıcı Adı</label>
-                    <input type="text" id="loginUsername" required placeholder="Kullanıcı adınız" autocomplete="username">
+                <div class="form-group mb-4">
+                    <label class="text-xs font-semibold text-slate-500 flex items-center gap-1.5 mb-1"><i class="fas fa-user"></i> Kullanıcı Adı</label>
+                    <input type="text" id="loginUsername" required placeholder="Kullanıcı adınız" autocomplete="username" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary-50 transition">
                 </div>
-                <div class="form-group">
-                    <label><i class="fas fa-lock"></i> Şifre</label>
-                    <input type="password" id="loginPassword" required placeholder="Şifreniz" autocomplete="current-password">
+                <div class="form-group mb-4">
+                    <label class="text-xs font-semibold text-slate-500 flex items-center gap-1.5 mb-1"><i class="fas fa-lock"></i> Şifre</label>
+                    <input type="password" id="loginPassword" required placeholder="Şifreniz" autocomplete="current-password" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary-50 transition">
                 </div>
                 <div id="loginError" class="login-error" style="display:none"></div>
-                <button type="submit" class="btn btn-primary login-btn">
+                <button type="submit" class="btn btn-primary w-full py-2.5 text-sm mt-1.5 justify-center">
                     <i class="fas fa-sign-in-alt"></i> Giriş Yap
                 </button>
             </form>
@@ -48,13 +64,13 @@
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <div class="logo-area">
+            <div class="flex items-center gap-3">
                 <div class="logo-icon">
                     <i class="fas fa-file-invoice-dollar"></i>
                 </div>
-                <div class="logo-text">
-                    <span class="brand-name">BİLGESİS</span>
-                    <span class="brand-sub">Teklif Yönetim</span>
+                <div class="flex flex-col">
+                    <span class="text-base font-bold tracking-wide text-primary leading-tight">BİLGESİS</span>
+                    <span class="text-[0.65rem] text-slate-400 tracking-wide">Teklif Yönetim</span>
                 </div>
             </div>
         </div>
@@ -94,10 +110,8 @@
             </a>
         </nav>
         <div class="sidebar-footer">
-            <div class="company-info-mini">
-                <p>BİLGESİS Teklif</p>
-                <p class="text-muted">v2.0.0</p>
-            </div>
+            <p class="text-[0.72rem] text-slate-400">BİLGESİS Teklif</p>
+            <p class="text-[0.72rem] text-slate-300">v2.0.0</p>
         </div>
     </aside>
 
@@ -109,10 +123,10 @@
                 <i class="fas fa-bars"></i>
             </button>
             <div class="topbar-title">
-                <h2 id="pageTitle">Gösterge Paneli</h2>
+                <h2 id="pageTitle" class="text-base font-bold text-slate-900 tracking-tight">Gösterge Paneli</h2>
             </div>
             <div class="topbar-actions">
-                <div class="search-box">
+                <div class="search-box hidden md:flex">
                     <i class="fas fa-search"></i>
                     <input type="text" placeholder="Teklif ara..." id="globalSearch">
                 </div>
@@ -122,8 +136,8 @@
                 </button>
                 <div class="user-menu" onclick="toggleUserDropdown()">
                     <div class="user-avatar" id="userAvatar">YO</div>
-                    <span class="user-name" id="userName">Yönetici</span>
-                    <i class="fas fa-chevron-down" style="font-size:0.65rem;color:var(--text-muted)"></i>
+                    <span class="user-name hidden sm:inline text-sm font-semibold text-slate-900" id="userName">Yönetici</span>
+                    <i class="fas fa-chevron-down text-[0.65rem] text-slate-400"></i>
                 </div>
                 <div class="user-dropdown" id="userDropdown">
                     <div class="dropdown-header" id="dropdownUserInfo"></div>
@@ -138,10 +152,10 @@
             <div class="reminder-banner-content">
                 <i class="fas fa-exclamation-triangle"></i>
                 <span id="reminderBannerText"></span>
-                <button class="btn btn-sm btn-outline" onclick="navigateTo('reminders')" style="margin-left:auto;color:#fff;border-color:rgba(255,255,255,0.5)">
+                <button class="btn btn-sm btn-outline ml-auto !text-white !border-white/50" onclick="navigateTo('reminders')">
                     Hatırlatmaları Gör
                 </button>
-                <button class="btn-icon" onclick="document.getElementById('reminderBanner').style.display='none'" style="color:#fff;background:transparent">
+                <button class="btn-icon !bg-transparent !text-white" onclick="document.getElementById('reminderBanner').style.display='none'">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -153,29 +167,29 @@
             <!-- ==================== DASHBOARD ==================== -->
             <section class="page active" id="page-dashboard">
                 <div class="stats-grid">
-                    <div class="stat-card stat-card-clickable" onclick="filterProposalsByStatus('all')" title="Tüm teklifleri görüntüle">
-                        <div class="stat-icon bg-primary"><i class="fas fa-file-invoice"></i></div>
+                    <div class="stat-card stat-card-clickable stat-card-primary" onclick="filterProposalsByStatus('all')" title="Tüm teklifleri görüntüle">
+                        <div class="stat-icon bg-primary-50 text-primary"><i class="fas fa-file-invoice"></i></div>
                         <div class="stat-info">
                             <span class="stat-value" id="totalProposals">0</span>
                             <span class="stat-label">Toplam Teklif</span>
                         </div>
                     </div>
-                    <div class="stat-card stat-card-clickable" onclick="filterProposalsByStatus('bekleyen')" title="Bekleyen teklifleri görüntüle">
-                        <div class="stat-icon bg-warning"><i class="fas fa-clock"></i></div>
+                    <div class="stat-card stat-card-clickable stat-card-warning" onclick="filterProposalsByStatus('bekleyen')" title="Bekleyen teklifleri görüntüle">
+                        <div class="stat-icon bg-amber-50 text-amber-600"><i class="fas fa-clock"></i></div>
                         <div class="stat-info">
                             <span class="stat-value" id="pendingProposals">0</span>
                             <span class="stat-label">Bekleyen</span>
                         </div>
                     </div>
-                    <div class="stat-card stat-card-clickable" onclick="filterProposalsByStatus('kabul')" title="Kabul edilen teklifleri görüntüle">
-                        <div class="stat-icon bg-success"><i class="fas fa-check-circle"></i></div>
+                    <div class="stat-card stat-card-clickable stat-card-success" onclick="filterProposalsByStatus('kabul')" title="Kabul edilen teklifleri görüntüle">
+                        <div class="stat-icon bg-teal-50 text-teal-700"><i class="fas fa-check-circle"></i></div>
                         <div class="stat-info">
                             <span class="stat-value" id="acceptedProposals">0</span>
                             <span class="stat-label">Kabul Edilen</span>
                         </div>
                     </div>
-                    <div class="stat-card stat-card-clickable" onclick="filterProposalsByStatus('red')" title="Reddedilen teklifleri görüntüle">
-                        <div class="stat-icon bg-danger"><i class="fas fa-times-circle"></i></div>
+                    <div class="stat-card stat-card-clickable stat-card-danger" onclick="filterProposalsByStatus('red')" title="Reddedilen teklifleri görüntüle">
+                        <div class="stat-icon bg-rose-50 text-rose-600"><i class="fas fa-times-circle"></i></div>
                         <div class="stat-info">
                             <span class="stat-value" id="rejectedProposals">0</span>
                             <span class="stat-label">Reddedilen</span>
@@ -185,8 +199,8 @@
 
                 <!-- Dashboard Hatırlatma Özeti -->
                 <div class="card reminder-summary-card" id="dashReminderCard" style="display:none">
-                    <div class="card-header" style="background:var(--warning-bg);border-left:4px solid var(--warning)">
-                        <h3><i class="fas fa-bell" style="color:var(--warning)"></i> Bugünkü Hatırlatmalar</h3>
+                    <div class="card-header !bg-amber-50 !border-l-4 !border-l-amber-500">
+                        <h3><i class="fas fa-bell !text-amber-500"></i> Bugünkü Hatırlatmalar</h3>
                         <a href="#" class="btn-link" onclick="navigateTo('reminders');return false">Tümünü Gör</a>
                     </div>
                     <div class="card-body" id="dashReminderBody"></div>
@@ -198,21 +212,23 @@
                             <h3><i class="fas fa-history"></i> Son Teklifler</h3>
                             <a href="#" class="btn-link" data-page="proposals">Tümünü Gör</a>
                         </div>
-                        <div class="card-body">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Teklif No</th>
-                                        <th>Müşteri</th>
-                                        <th>Temsilci</th>
-                                        <th>Tutar</th>
-                                        <th>Durum</th>
-                                        <th>Tarih</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="recentProposalsBody">
-                                </tbody>
-                            </table>
+                        <div class="card-body !p-0">
+                            <div class="overflow-x-auto">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Teklif No</th>
+                                            <th>Müşteri</th>
+                                            <th>Temsilci</th>
+                                            <th>Tutar</th>
+                                            <th>Durum</th>
+                                            <th>Tarih</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="recentProposalsBody">
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                     <div class="card quick-actions">
@@ -307,7 +323,7 @@
                             <div class="form-grid cols-3">
                                 <div class="form-group">
                                     <label>Sipariş No</label>
-                                    <input type="text" id="orderNo" placeholder="Otomatik" readonly style="background:#f5f5f5;cursor:default">
+                                    <input type="text" id="orderNo" placeholder="Otomatik" readonly class="!bg-slate-50 !cursor-default">
                                 </div>
                                 <div class="form-group">
                                     <label>Teklif Tarihi</label>
@@ -356,7 +372,7 @@
                             </div>
                         </div>
                         <div class="card-body">
-                            <div class="table-responsive">
+                            <div class="table-responsive overflow-x-auto">
                                 <table class="data-table product-table">
                                     <thead>
                                         <tr>
@@ -466,21 +482,23 @@
                 </div>
                 <div class="card">
                     <div class="card-body no-padding">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Teklif No</th>
-                                    <th>Müşteri</th>
-                                    <th>Temsilci</th>
-                                    <th>Tarih</th>
-                                    <th>Tutar</th>
-                                    <th>Durum</th>
-                                    <th>İşlemler</th>
-                                </tr>
-                            </thead>
-                            <tbody id="proposalsTableBody">
-                            </tbody>
-                        </table>
+                        <div class="overflow-x-auto">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Teklif No</th>
+                                        <th>Müşteri</th>
+                                        <th>Temsilci</th>
+                                        <th>Tarih</th>
+                                        <th>Tutar</th>
+                                        <th>Durum</th>
+                                        <th>İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="proposalsTableBody">
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -500,8 +518,6 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Hatırlatma Kartları -->
                 <div id="remindersContainer"></div>
             </section>
 
@@ -519,20 +535,22 @@
                 </div>
                 <div class="card">
                     <div class="card-body no-padding">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Firma Adı</th>
-                                    <th>Yetkili</th>
-                                    <th>Telefon</th>
-                                    <th>E-posta</th>
-                                    <th>Teklif Sayısı</th>
-                                    <th>İşlemler</th>
-                                </tr>
-                            </thead>
-                            <tbody id="customersTableBody">
-                            </tbody>
-                        </table>
+                        <div class="overflow-x-auto">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Firma Adı</th>
+                                        <th>Yetkili</th>
+                                        <th>Telefon</th>
+                                        <th>E-posta</th>
+                                        <th>Teklif Sayısı</th>
+                                        <th>İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="customersTableBody">
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -551,19 +569,21 @@
                 </div>
                 <div class="card">
                     <div class="card-body no-padding">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Ürün Adı</th>
-                                    <th>Kategori</th>
-                                    <th>Birim Fiyat</th>
-                                    <th>Para Birimi</th>
-                                    <th>İşlemler</th>
-                                </tr>
-                            </thead>
-                            <tbody id="productsTableBody">
-                            </tbody>
-                        </table>
+                        <div class="overflow-x-auto">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Ürün Adı</th>
+                                        <th>Kategori</th>
+                                        <th>Birim Fiyat</th>
+                                        <th>Para Birimi</th>
+                                        <th>İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="productsTableBody">
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -572,7 +592,7 @@
             <section class="page" id="page-personnel">
                 <div class="page-toolbar">
                     <div class="toolbar-left">
-                        <h3 style="margin:0;color:var(--primary)">Personel / Kullanıcı Yönetimi</h3>
+                        <h3 class="m-0 text-primary font-bold">Personel / Kullanıcı Yönetimi</h3>
                     </div>
                     <div class="toolbar-right">
                         <button class="btn btn-primary" onclick="showPersonnelModal()">
@@ -582,19 +602,21 @@
                 </div>
                 <div class="card">
                     <div class="card-body no-padding">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Ad Soyad</th>
-                                    <th>Kullanıcı Adı</th>
-                                    <th>Rol</th>
-                                    <th>E-posta</th>
-                                    <th>İşlemler</th>
-                                </tr>
-                            </thead>
-                            <tbody id="personnelTableBody">
-                            </tbody>
-                        </table>
+                        <div class="overflow-x-auto">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Ad Soyad</th>
+                                        <th>Kullanıcı Adı</th>
+                                        <th>Rol</th>
+                                        <th>E-posta</th>
+                                        <th>İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="personnelTableBody">
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -658,7 +680,7 @@
                                 <input type="password" id="settSmtpPass" placeholder="••••••••">
                             </div>
                         </div>
-                        <div class="info-box" style="margin-top:12px; padding:12px; background:var(--bg-light); border-radius:8px; font-size:13px; color:var(--text-muted);">
+                        <div class="mt-3 p-3 bg-slate-50 rounded-lg text-[13px] text-slate-400">
                             <i class="fas fa-info-circle"></i> Gmail için: Google Hesabı → Güvenlik → 2 Adımlı Doğrulama açın → Uygulama Şifreleri bölümünden bir şifre oluşturun.
                         </div>
                     </div>
@@ -860,7 +882,7 @@ BİLGESİS Bilgi Teknolojileri</textarea>
                 <button class="modal-close" onclick="closeModal('pdfPreviewModal')">&times;</button>
             </div>
             <div class="modal-body" style="padding:0; height:70vh;">
-                <iframe id="pdfPreviewFrame" style="width:100%;height:100%;border:none;"></iframe>
+                <iframe id="pdfPreviewFrame" class="w-full h-full border-0"></iframe>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="closeModal('pdfPreviewModal')">Kapat</button>
@@ -919,7 +941,7 @@ BİLGESİS Bilgi Teknolojileri</textarea>
                     <div class="form-group">
                         <label>Telefon Numarası <span class="required">*</span></label>
                         <input type="tel" id="sendWhatsappPhone" placeholder="905xxxxxxxxx">
-                        <small style="color:var(--text-muted)">Ülke kodu ile birlikte (örn: 905321234567)</small>
+                        <small class="text-slate-400 text-xs">Ülke kodu ile birlikte (örn: 905321234567)</small>
                     </div>
                     <div class="form-group">
                         <label>Mesaj</label>
@@ -933,7 +955,7 @@ BİLGESİS Bilgi Teknolojileri</textarea>
                             <input type="checkbox" id="sendWaLink" checked> Teklif kabul linki ekle
                         </label>
                     </div>
-                    <div class="wa-actions" style="display:flex;gap:8px;margin-top:10px">
+                    <div class="flex gap-2 mt-2.5">
                         <button type="button" class="btn btn-sm btn-outline" onclick="downloadProposalPdfForSend()">
                             <i class="fas fa-file-pdf"></i> PDF İndir
                         </button>
@@ -980,7 +1002,7 @@ BİLGESİS Bilgi Teknolojileri</textarea>
                 <div class="form-group" id="nextCallDateGroup">
                     <label>Sonraki Arama Tarihi <span class="required">*</span></label>
                     <input type="date" id="nextCallDate">
-                    <small style="color:var(--text-muted)">Kabul/Red dışında zorunludur</small>
+                    <small class="text-slate-400 text-xs">Kabul/Red dışında zorunludur</small>
                 </div>
             </div>
             <div class="modal-footer">
@@ -997,7 +1019,7 @@ BİLGESİS Bilgi Teknolojileri</textarea>
                 <h3><i class="fas fa-file-invoice"></i> <span id="rdTitle">Teklif Detay</span></h3>
                 <button class="modal-close" onclick="closeModal('reminderDetailModal')">&times;</button>
             </div>
-            <div class="modal-body" id="rdBody" style="padding:0;max-height:75vh;overflow-y:auto">
+            <div class="modal-body !p-0 max-h-[75vh] overflow-y-auto" id="rdBody">
             </div>
             <div class="modal-footer" id="rdFooter">
             </div>
