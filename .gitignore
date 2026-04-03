@@ -1,5 +1,6 @@
 node_modules/
 server/.env
+.env
 server/node_modules/
 *.docx
 *.pdf
