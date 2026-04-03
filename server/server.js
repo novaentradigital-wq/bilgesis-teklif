@@ -290,12 +290,7 @@ app.set('trust proxy', 1);
 app.use(cors({
     origin: process.env.ALLOWED_ORIGINS
         ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
-        : (origin, callback) => {
-            // origin undefined = same-origin isteği (izin ver)
-            // origin tanımlı = cross-origin (reddet)
-            if (!origin) return callback(null, true);
-            callback(new Error('CORS izni yok'));
-        },
+        : true,
     credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
