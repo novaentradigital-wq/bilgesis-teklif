@@ -25,14 +25,14 @@ const PORT = process.env.PORT || 3000;
 // Şifre hashleme (bcrypt yerine native crypto - ek bağımlılık gerektirmez)
 function hashPassword(password) {
     const salt = crypto.randomBytes(16).toString('hex');
-    const hash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+    const hash = crypto.pbkdf2Sync(password, salt, 310000, 64, 'sha512').toString('hex');
     return `${salt}:${hash}`;
 }
 
 function verifyPassword(password, stored) {
     if (!stored.includes(':')) return password === stored; // eski plaintext uyumu
     const [salt, hash] = stored.split(':');
-    const verify = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+    const verify = crypto.pbkdf2Sync(password, salt, 310000, 64, 'sha512').toString('hex');
     return hash === verify;
 }
 
@@ -40,7 +40,7 @@ function verifyPassword(password, stored) {
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
 
 function generateToken(user) {
-    const payload = JSON.stringify({ id: user.id, role: user.role, exp: Date.now() + 24 * 60 * 60 * 1000 });
+    const payload = JSON.stringify({ id: user.id, role: user.role, exp: Date.now() + 8 * 60 * 60 * 1000 });
     const signature = crypto.createHmac('sha256', JWT_SECRET).update(payload).digest('hex');
     return Buffer.from(payload).toString('base64') + '.' + signature;
 }
@@ -63,11 +63,25 @@ function authMiddleware(req, res, next) {
     if (!auth || !auth.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Yetkilendirme gerekli' });
     }
-    const user = verifyToken(auth.slice(7));
+    const token = auth.slice(7);
+    if (tokenBlacklist.has(token)) return res.status(401).json({ error: 'Oturum sonlandırılmış' });
+    const user = verifyToken(token);
     if (!user) return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token' });
     req.user = user;
+    req.token = token;
     next();
 }
+
+// Admin yetki kontrolü
+function adminOnly(req, res, next) {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Bu işlem için yönetici yetkisi gerekli' });
+    }
+    next();
+}
+
+// Token blacklist (logout desteği)
+const tokenBlacklist = new Set();
 
 // Rate limiter (basit, ek bağımlılık gerektirmez)
 const loginAttempts = new Map();
@@ -76,12 +90,39 @@ function loginRateLimit(req, res, next) {
     const now = Date.now();
     const attempts = loginAttempts.get(ip) || [];
     const recent = attempts.filter(t => now - t < 5 * 60 * 1000); // son 5 dk
-    if (recent.length >= 20) {
+    if (recent.length >= 5) {
         return res.status(429).json({ error: 'Çok fazla giriş denemesi. 5 dakika bekleyin.' });
     }
     recent.push(now);
     loginAttempts.set(ip, recent);
     next();
+}
+
+// Genel API rate limiter
+const apiRequests = new Map();
+function apiRateLimit(req, res, next) {
+    const ip = req.ip;
+    const now = Date.now();
+    const requests = apiRequests.get(ip) || [];
+    const recent = requests.filter(t => now - t < 60 * 1000); // son 1 dk
+    if (recent.length >= 100) {
+        return res.status(429).json({ error: 'Çok fazla istek. Lütfen bekleyin.' });
+    }
+    recent.push(now);
+    apiRequests.set(ip, recent);
+    next();
+}
+
+// Input doğrulama yardımcıları
+function validateString(val, maxLen = 500) {
+    return typeof val === 'string' && val.length <= maxLen;
+}
+function validateEmail(val) {
+    if (!val) return true; // opsiyonel
+    return typeof val === 'string' && val.length <= 200 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+}
+function validatePassword(val) {
+    return typeof val === 'string' && val.length >= 8 && val.length <= 128;
 }
 
 // PostgreSQL bağlantısı
@@ -202,10 +243,16 @@ async function initDatabase() {
 
 // Middleware
 app.use(cors({
-    origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
+    origin: process.env.ALLOWED_ORIGINS
+        ? process.env.ALLOWED_ORIGINS.split(',')
+        : (origin, callback) => {
+            // Aynı sunucudan gelen isteklere izin ver (origin undefined = same-origin)
+            callback(null, origin || true);
+        },
     credentials: true
 }));
 app.use(express.json({ limit: '2mb' }));
+app.use(apiRateLimit);
 
 // Güvenlik başlıkları
 app.use((req, res, next) => {
@@ -213,6 +260,9 @@ app.use((req, res, next) => {
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data:; connect-src 'self'");
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
     next();
 });
 
@@ -238,7 +288,7 @@ app.post('/api/login', loginRateLimit, async (req, res) => {
             const token = generateToken(user);
             res.json({ success: true, user, token });
         } else {
-            res.json({ success: false, message: 'Kullanıcı adı veya şifre hatalı!' });
+            res.status(401).json({ success: false, message: 'Kullanıcı adı veya şifre hatalı!' });
         }
     } catch (err) {
         console.error('Login hatası:', err.message);
@@ -257,16 +307,29 @@ app.get('/api/users', authMiddleware, async (req, res) => {
     }
 });
 
-app.post('/api/users', authMiddleware, async (req, res) => {
+app.post('/api/users', authMiddleware, adminOnly, async (req, res) => {
     try {
         const { id, name, username, password, role, email } = req.body;
         if (!name || !username || !password) {
             return res.status(400).json({ error: 'Ad, kullanıcı adı ve şifre gerekli' });
         }
+        if (!validateString(name, 200) || !validateString(username, 100)) {
+            return res.status(400).json({ error: 'Geçersiz ad veya kullanıcı adı' });
+        }
+        if (!password.includes(':') && !validatePassword(password)) {
+            return res.status(400).json({ error: 'Şifre en az 8 karakter olmalıdır' });
+        }
+        if (email && !validateEmail(email)) {
+            return res.status(400).json({ error: 'Geçersiz e-posta adresi' });
+        }
+        const allowedRoles = ['admin', 'personel'];
+        if (role && !allowedRoles.includes(role)) {
+            return res.status(400).json({ error: 'Geçersiz rol' });
+        }
         const hashedPass = password.includes(':') ? password : hashPassword(password);
         await pool.query(
             'INSERT INTO users (id, name, username, password, role, email) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (id) DO UPDATE SET name=$2, username=$3, password=$4, role=$5, email=$6',
-            [id, name, username, hashedPass, role, email || '']
+            [id, name, username, hashedPass, role || 'personel', email || '']
         );
         res.json({ success: true });
     } catch (err) {
@@ -275,8 +338,11 @@ app.post('/api/users', authMiddleware, async (req, res) => {
     }
 });
 
-app.delete('/api/users/:id', authMiddleware, async (req, res) => {
+app.delete('/api/users/:id', authMiddleware, adminOnly, async (req, res) => {
     try {
+        if (req.params.id === 'admin1') {
+            return res.status(400).json({ error: 'Ana yönetici hesabı silinemez' });
+        }
         await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
         res.json({ success: true });
     } catch (err) {
@@ -347,6 +413,12 @@ app.get('/api/customers', authMiddleware, async (req, res) => {
 app.post('/api/customers', authMiddleware, async (req, res) => {
     try {
         const c = req.body;
+        if (!c.name || !validateString(c.name, 300)) {
+            return res.status(400).json({ error: 'Geçerli bir müşteri adı gerekli' });
+        }
+        if (c.email && !validateEmail(c.email)) {
+            return res.status(400).json({ error: 'Geçersiz e-posta adresi' });
+        }
         await pool.query(
             `INSERT INTO customers (id, name, contact_person, phone, email, fax, tax_office, tax_number, address)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
@@ -388,6 +460,12 @@ app.get('/api/products', authMiddleware, async (req, res) => {
 app.post('/api/products', authMiddleware, async (req, res) => {
     try {
         const p = req.body;
+        if (!p.name || !validateString(p.name, 300)) {
+            return res.status(400).json({ error: 'Geçerli bir ürün adı gerekli' });
+        }
+        if (p.price !== undefined && (isNaN(Number(p.price)) || Number(p.price) < 0)) {
+            return res.status(400).json({ error: 'Geçersiz fiyat' });
+        }
         await pool.query(
             `INSERT INTO products (id, name, price, currency, category)
              VALUES ($1,$2,$3,$4,$5)
@@ -423,7 +501,7 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
     }
 });
 
-app.post('/api/settings', authMiddleware, async (req, res) => {
+app.post('/api/settings', authMiddleware, adminOnly, async (req, res) => {
     try {
         const settings = req.body;
         for (const [key, value] of Object.entries(settings)) {
@@ -508,8 +586,14 @@ app.post('/api/send-email', authMiddleware, async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         console.error('E-posta gönderme hatası:', err.message);
-        res.status(500).json({ error: 'E-posta gönderilemedi: ' + err.message });
+        res.status(500).json({ error: 'E-posta gönderilemedi. Lütfen SMTP ayarlarınızı kontrol edin.' });
     }
+});
+
+// ============ LOGOUT ============
+app.post('/api/logout', authMiddleware, (req, res) => {
+    tokenBlacklist.add(req.token);
+    res.json({ success: true });
 });
 
 // SPA: tüm route'ları index.html'e yönlendir

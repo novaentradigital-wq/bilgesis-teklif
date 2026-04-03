@@ -11,7 +11,7 @@ function generateProposalPDF(data, download = false, preview = false) {
     const contentWidth = pageWidth - 2 * margin;
 
     const settings = DB.getSettings();
-    const companyName = settings.companyName || 'BİLGESİS BİLGİ TEKNOLOJİLERİ SAN. TİC. LTD ŞTİ.';
+    const companyName = settings.companyName || 'BİLGESİS BİLGİSAYAR VE İLETİŞİM SİS. SAN. TİC. LTD. ŞTİ.';
     const companyAddress = settings.address || '';
     const companyPhone = settings.phone || '';
     const companyFax = settings.fax || '';

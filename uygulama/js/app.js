@@ -3,6 +3,12 @@
    Ana Uygulama JavaScript v2.0
    ============================================ */
 
+// ============ XSS KORUMASI ============
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
 // ============ VERİ YÖNETİMİ (PostgreSQL API + Local Cache) ============
 const API_BASE = window.location.origin + '/api';
 const _cache = {};
@@ -170,7 +176,15 @@ async function handleLogin(e) {
 }
 
 function handleLogout() {
+    const token = sessionStorage.getItem('bilgesis_token');
+    if (token) {
+        fetch(API_BASE + '/logout', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token }
+        }).catch(() => {});
+    }
     sessionStorage.removeItem('bilgesis_user');
+    sessionStorage.removeItem('bilgesis_token');
     location.reload();
 }
 
@@ -398,8 +412,8 @@ function renderDashboard() {
             return `
             <tr>
                 <td><strong>${p.proposalNo}</strong></td>
-                <td>${p.customerName}</td>
-                <td style="font-size:0.82rem"><i class="fas fa-user" style="font-size:0.65rem;color:var(--text-muted);margin-right:2px"></i>${repName}</td>
+                <td>${escapeHtml(p.customerName)}</td>
+                <td style="font-size:0.82rem"><i class="fas fa-user" style="font-size:0.65rem;color:var(--text-muted);margin-right:2px"></i>${escapeHtml(repName)}</td>
                 <td><strong>${formatMoney(p.grandTotal)} ${getCurrencySymbol(p.currency)}</strong></td>
                 <td><span class="status-badge status-${p.status}">${getStatusText(p.status)}</span></td>
                 <td>${formatDate(p.date)}</td>
@@ -451,7 +465,7 @@ function renderDashboardReminders() {
         <div class="reminder-item ${cls}">
             <div class="ri-icon"><i class="fas ${icon}"></i></div>
             <div class="ri-info">
-                <strong>${p.customerName}</strong> - ${p.proposalNo} - ${formatMoney(p.grandTotal)} ${getCurrencySymbol(p.currency)}
+                <strong>${escapeHtml(p.customerName)}</strong> - ${escapeHtml(p.proposalNo)} - ${formatMoney(p.grandTotal)} ${getCurrencySymbol(p.currency)}
                 <small>${label} | ${formatDate(p.reminderDate)} | ${callInfo}</small>
             </div>
             <button class="btn btn-xs btn-primary" onclick="openCallResultModal('${p.id}')"><i class="fas fa-phone"></i> Sonuç Gir</button>
@@ -570,8 +584,8 @@ function renderReminders() {
                     <div class="rc-timeline-dot ${dotCls}"><i class="fas ${dotIcon}"></i></div>
                     <div class="rc-timeline-date">${formatDateTime(log.date)}</div>
                     <div class="rc-timeline-status">${statusLabel}</div>
-                    ${log.note ? `<div class="rc-timeline-note">"${log.note}"</div>` : ''}
-                    <div class="rc-timeline-user"><i class="fas fa-user"></i> ${logUser}</div>
+                    ${log.note ? `<div class="rc-timeline-note">"${escapeHtml(log.note)}"</div>` : ''}
+                    <div class="rc-timeline-user"><i class="fas fa-user"></i> ${escapeHtml(logUser)}</div>
                 </div>`;
             }).join('') + '</div>';
         } else {
@@ -595,7 +609,7 @@ function renderReminders() {
         <div class="reminder-card ${cardCls}">
             <div class="rc-header">
                 <div class="rc-header-left">
-                    <span class="rc-customer">${p.customerName}</span>
+                    <span class="rc-customer">${escapeHtml(p.customerName)}</span>
                     <span class="rc-date-badge ${dateBadgeCls}"><i class="fas fa-calendar-alt"></i> ${dateLabel}</span>
                     <span class="status-badge status-${p.status}">${getStatusText(p.status)}</span>
                 </div>
@@ -605,9 +619,9 @@ function renderReminders() {
                 <div class="rc-info-row">
                     <div class="rc-info-item"><i class="fas fa-file-invoice"></i> <strong>${p.proposalNo}</strong></div>
                     <div class="rc-info-item"><i class="fas fa-money-bill"></i> <strong>${formatMoney(p.grandTotal)} ${getCurrencySymbol(p.currency)}</strong></div>
-                    <div class="rc-info-item"><i class="fas fa-phone"></i> ${p.customerPhone || '-'}</div>
-                    <div class="rc-info-item"><i class="fas fa-envelope"></i> ${p.customerEmail || '-'}</div>
-                    <div class="rc-info-item"><i class="fas fa-user-tie"></i> ${repName}</div>
+                    <div class="rc-info-item"><i class="fas fa-phone"></i> ${escapeHtml(p.customerPhone || '-')}</div>
+                    <div class="rc-info-item"><i class="fas fa-envelope"></i> ${escapeHtml(p.customerEmail || '-')}</div>
+                    <div class="rc-info-item"><i class="fas fa-user-tie"></i> ${escapeHtml(repName)}</div>
                     <div class="rc-info-item"><i class="fas fa-calendar"></i> Teklif: ${formatDate(p.date)}</div>
                 </div>
                 <div style="font-size:0.82rem;font-weight:700;color:var(--primary);margin-bottom:8px">
@@ -643,7 +657,7 @@ function openReminderDetail(proposalId) {
                 const price = parseFloat(it.unitPrice) || 0;
                 return `<tr>
                     <td>${i + 1}</td>
-                    <td>${it.name || it.description || '-'}</td>
+                    <td>${escapeHtml(it.name || it.description || '-')}</td>
                     <td>${qty}</td>
                     <td>${formatMoney(price)} ${currSym}</td>
                     <td>${formatMoney(qty * price)} ${currSym}</td>
@@ -671,8 +685,8 @@ function openReminderDetail(proposalId) {
                 <div class="rc-timeline-dot ${dotCls}"><i class="fas ${dotIcon}"></i></div>
                 <div class="rc-timeline-date">${formatDateTime(log.date)}</div>
                 <div class="rc-timeline-status">${getCallStatusText(log.status)}</div>
-                ${log.note ? `<div class="rc-timeline-note">"${log.note}"</div>` : ''}
-                <div class="rc-timeline-user"><i class="fas fa-user"></i> ${log.user || '-'}</div>
+                ${log.note ? `<div class="rc-timeline-note">"${escapeHtml(log.note)}"</div>` : ''}
+                <div class="rc-timeline-user"><i class="fas fa-user"></i> ${escapeHtml(log.user || '-')}</div>
             </div>`;
         }).join('');
         logsHtml = `<div class="rc-timeline">${logsHtml}</div>`;
@@ -684,13 +698,13 @@ function openReminderDetail(proposalId) {
         <div class="rd-section">
             <div class="rd-section-title"><i class="fas fa-building"></i> Firma Bilgileri</div>
             <div class="rd-grid">
-                <div class="rd-field"><span class="rd-label">Firma Adı</span><span class="rd-value">${p.customerName || '-'}</span></div>
-                <div class="rd-field"><span class="rd-label">Telefon</span><span class="rd-value">${p.customerPhone || '-'}</span></div>
-                <div class="rd-field"><span class="rd-label">E-posta</span><span class="rd-value">${p.customerEmail || '-'}</span></div>
-                <div class="rd-field"><span class="rd-label">Adres</span><span class="rd-value">${p.customerAddress || '-'}</span></div>
-                <div class="rd-field"><span class="rd-label">Vergi Dairesi</span><span class="rd-value">${p.taxOffice || '-'}</span></div>
-                <div class="rd-field"><span class="rd-label">Vergi No</span><span class="rd-value">${p.taxNumber || '-'}</span></div>
-                <div class="rd-field"><span class="rd-label">Temsilci</span><span class="rd-value">${repName}</span></div>
+                <div class="rd-field"><span class="rd-label">Firma Adı</span><span class="rd-value">${escapeHtml(p.customerName || '-')}</span></div>
+                <div class="rd-field"><span class="rd-label">Telefon</span><span class="rd-value">${escapeHtml(p.customerPhone || '-')}</span></div>
+                <div class="rd-field"><span class="rd-label">E-posta</span><span class="rd-value">${escapeHtml(p.customerEmail || '-')}</span></div>
+                <div class="rd-field"><span class="rd-label">Adres</span><span class="rd-value">${escapeHtml(p.customerAddress || '-')}</span></div>
+                <div class="rd-field"><span class="rd-label">Vergi Dairesi</span><span class="rd-value">${escapeHtml(p.taxOffice || '-')}</span></div>
+                <div class="rd-field"><span class="rd-label">Vergi No</span><span class="rd-value">${escapeHtml(p.taxNumber || '-')}</span></div>
+                <div class="rd-field"><span class="rd-label">Temsilci</span><span class="rd-value">${escapeHtml(repName)}</span></div>
                 <div class="rd-field"><span class="rd-label">Teklif Tarihi</span><span class="rd-value">${formatDate(p.date)}</span></div>
             </div>
         </div>
@@ -1123,11 +1137,11 @@ function renderProposals() {
         <tr>
             <td><strong>${p.proposalNo}</strong></td>
             <td>
-                <div><strong>${p.customerName}</strong></div>
-                <div style="font-size:0.75rem;color:var(--text-muted)">${p.contactPerson || ''}</div>
+                <div><strong>${escapeHtml(p.customerName)}</strong></div>
+                <div style="font-size:0.75rem;color:var(--text-muted)">${escapeHtml(p.contactPerson || '')}</div>
             </td>
             <td>
-                <div style="font-size:0.82rem"><i class="fas fa-user" style="font-size:0.7rem;color:var(--text-muted);margin-right:3px"></i>${repName}</div>
+                <div style="font-size:0.82rem"><i class="fas fa-user" style="font-size:0.7rem;color:var(--text-muted);margin-right:3px"></i>${escapeHtml(repName)}</div>
             </td>
             <td>${formatDate(p.date)}</td>
             <td><strong>${formatMoney(p.grandTotal)} ${getCurrencySymbol(p.currency)}</strong></td>
