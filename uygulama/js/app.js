@@ -105,7 +105,7 @@ const DB = {
 // ============ KULLANICI SİSTEMİ ============
 function getDefaultUsers() {
     return [
-        { id: 'admin1', name: 'Yönetici', username: 'admin', password: 'admin123', role: 'admin', email: '' }
+        { id: 'admin1', name: 'Yönetici', username: 'admin', password: '', role: 'admin', email: '' }
     ];
 }
 

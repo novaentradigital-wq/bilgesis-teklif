@@ -26,6 +26,7 @@ services:
       DB_NAME: bilgesis_teklif
       DB_USER: postgres
       DB_PASSWORD: ${DB_PASSWORD}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       PORT: 3000
     depends_on:
       db:

@@ -10,9 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT INTO users (id, name, username, password, role, email)
-VALUES ('admin1', 'Yönetici', 'admin', 'admin123', 'admin', '')
-ON CONFLICT (id) DO NOTHING;
+-- Admin kullanıcısı server.js tarafından env değişkeninden oluşturulur
 
 CREATE TABLE IF NOT EXISTS customers (
     id VARCHAR(50) PRIMARY KEY,

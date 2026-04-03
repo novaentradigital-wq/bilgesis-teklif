@@ -106,9 +106,7 @@ async function initDatabase() {
                 email VARCHAR(200),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
-            INSERT INTO users (id, name, username, password, role, email)
-            VALUES ('admin1', 'Yonetici', 'admin', 'admin123', 'admin', '')
-            ON CONFLICT (id) DO NOTHING;
+            -- Admin kullanıcısı aşağıda env değişkeninden oluşturulur
 
             CREATE TABLE IF NOT EXISTS customers (
                 id VARCHAR(50) PRIMARY KEY,
@@ -180,9 +178,18 @@ async function initDatabase() {
             CREATE INDEX IF NOT EXISTS idx_proposals_date ON proposals(date);
             CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
         `);
-        // Admin şifresini hashle (plaintext ise)
-        const adminRow = await pool.query('SELECT password FROM users WHERE id = $1', ['admin1']);
-        if (adminRow.rows.length > 0 && !adminRow.rows[0].password.includes(':')) {
+        // Admin kullanıcısını oluştur (yoksa)
+        const adminRow = await pool.query('SELECT id, password FROM users WHERE id = $1', ['admin1']);
+        if (adminRow.rows.length === 0) {
+            const adminPass = process.env.ADMIN_PASSWORD || 'degistir123';
+            const hashed = hashPassword(adminPass);
+            await pool.query(
+                'INSERT INTO users (id, name, username, password, role, email) VALUES ($1,$2,$3,$4,$5,$6)',
+                ['admin1', 'Yönetici', 'admin', hashed, 'admin', '']
+            );
+            console.log('✓ Admin kullanıcısı oluşturuldu (şifreyi .env dosyasından alıyor)');
+        } else if (!adminRow.rows[0].password.includes(':')) {
+            // Eski plaintext şifreyi hashle
             const hashed = hashPassword(adminRow.rows[0].password);
             await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashed, 'admin1']);
             console.log('✓ Admin şifresi hashlendi');

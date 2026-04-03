@@ -15,9 +15,7 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Varsayılan admin kullanıcı
-INSERT INTO users (id, name, username, password, role, email)
-VALUES ('admin1', 'Yönetici', 'admin', 'admin123', 'admin', '');
+-- Admin kullanıcısı server.js tarafından env değişkeninden oluşturulur
 
 -- Müşteriler tablosu
 CREATE TABLE customers (
