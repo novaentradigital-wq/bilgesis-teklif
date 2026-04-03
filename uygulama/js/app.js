@@ -1421,9 +1421,16 @@ async function executeSend() {
             let pdfBase64 = null;
             let pdfFilename = null;
             if (document.getElementById('sendPdfAttach').checked && p) {
-                const doc = generateProposalPDF(p, false, false);
-                pdfBase64 = doc.output('datauristring').split(',')[1];
-                pdfFilename = `bilgesis_teklif_${p.proposalNo || 'yeni'}.pdf`;
+                try {
+                    if (!window.jspdf) {
+                        throw new Error('jsPDF kütüphanesi yüklenemedi');
+                    }
+                    const doc = generateProposalPDF(p, false, false);
+                    pdfBase64 = doc.output('datauristring').split(',')[1];
+                    pdfFilename = `bilgesis_teklif_${p.proposalNo || 'yeni'}.pdf`;
+                } catch (pdfErr) {
+                    showToast('PDF oluşturulamadı: ' + pdfErr.message + '. Mail PDF eksiz gönderilecek.', 'warning');
+                }
             }
 
             const response = await fetch(API_BASE + '/send-email', {
