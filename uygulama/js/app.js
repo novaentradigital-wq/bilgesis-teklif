@@ -1417,6 +1417,15 @@ async function executeSend() {
         }
 
         try {
+            // PDF ek olarak eklenecekse base64 olarak üret
+            let pdfBase64 = null;
+            let pdfFilename = null;
+            if (document.getElementById('sendPdfAttach').checked && p) {
+                const doc = generateProposalPDF(p, false, false);
+                pdfBase64 = doc.output('datauristring').split(',')[1];
+                pdfFilename = `bilgesis_teklif_${p.proposalNo || 'yeni'}.pdf`;
+            }
+
             const response = await fetch(API_BASE + '/send-email', {
                 method: 'POST',
                 headers: getAuthHeaders(),
@@ -1428,19 +1437,15 @@ async function executeSend() {
                     smtpPort: settings.smtpPort || '587',
                     smtpUser: settings.smtpUser,
                     smtpPass: settings.smtpPass,
-                    fromName: settings.companyName || settings.smtpUser
+                    fromName: settings.companyName || settings.smtpUser,
+                    pdfBase64,
+                    pdfFilename
                 })
             });
 
             const result = await response.json();
             if (result.success) {
-                showToast('E-posta başarıyla gönderildi!', 'success');
-
-                // PDF indir
-                if (document.getElementById('sendPdfAttach').checked && p) {
-                    generateProposalPDF(p, true);
-                    showToast('PDF indirildi, gerekirse e-postaya manuel ekleyebilirsiniz.', 'info');
-                }
+                showToast('E-posta başarıyla gönderildi!' + (pdfBase64 ? ' (PDF ek olarak eklendi)' : ''), 'success');
             } else {
                 showToast('E-posta gönderilemedi: ' + result.error, 'error');
             }

@@ -560,7 +560,7 @@ const nodemailer = require('nodemailer');
 
 app.post('/api/send-email', authMiddleware, async (req, res) => {
     try {
-        const { to, subject, body, smtpHost, smtpPort, smtpUser, smtpPass, fromName } = req.body;
+        const { to, subject, body, smtpHost, smtpPort, smtpUser, smtpPass, fromName, pdfBase64, pdfFilename } = req.body;
 
         if (!to || !smtpHost || !smtpUser || !smtpPass) {
             return res.status(400).json({ error: 'SMTP ayarları ve alıcı e-posta gereklidir.' });
@@ -576,12 +576,22 @@ app.post('/api/send-email', authMiddleware, async (req, res) => {
             }
         });
 
-        await transporter.sendMail({
+        const mailOptions = {
             from: `"${fromName || smtpUser}" <${smtpUser}>`,
             to: to,
             subject: subject || '',
             text: body || ''
-        });
+        };
+
+        if (pdfBase64 && pdfFilename) {
+            mailOptions.attachments = [{
+                filename: pdfFilename,
+                content: Buffer.from(pdfBase64, 'base64'),
+                contentType: 'application/pdf'
+            }];
+        }
+
+        await transporter.sendMail(mailOptions);
 
         res.json({ success: true });
     } catch (err) {
