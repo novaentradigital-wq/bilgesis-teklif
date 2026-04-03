@@ -894,11 +894,11 @@ BİLGESİS Bilgi Teknolojileri</textarea>
                 <div class="send-tab-content active" id="sendEmailContent">
                     <div class="form-group">
                         <label>Alıcı E-posta <span class="required">*</span></label>
-                        <input type="email" id="sendEmailTo" required autocomplete="off">
+                        <input type="email" id="sendEmailTo" name="sendEmailTo_nofill" required autocomplete="nope">
                     </div>
                     <div class="form-group">
                         <label>Konu</label>
-                        <input type="text" id="sendEmailSubject" autocomplete="off">
+                        <input type="text" id="sendEmailSubject" name="sendEmailSubject_nofill" autocomplete="nope" readonly onfocus="this.removeAttribute('readonly')">
                     </div>
                     <div class="form-group">
                         <label>Mesaj</label>
