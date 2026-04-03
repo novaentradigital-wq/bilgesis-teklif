@@ -252,7 +252,7 @@ async function initApp() {
     const initials = user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     document.getElementById('userAvatar').textContent = initials;
     document.getElementById('userName').textContent = user.name;
-    document.getElementById('dropdownUserInfo').innerHTML = `<strong>${user.name}</strong><br><small>${user.role === 'admin' ? 'Yönetici' : 'Personel'}</small>`;
+    document.getElementById('dropdownUserInfo').innerHTML = `<strong>${escapeHtml(user.name)}</strong><br><small>${user.role === 'admin' ? 'Yönetici' : 'Personel'}</small>`;
 
     // Show/hide admin-only elements
     document.querySelectorAll('.admin-only').forEach(el => {
@@ -419,7 +419,7 @@ function renderDashboard() {
                 <td>${escapeHtml(p.customerName)}</td>
                 <td style="font-size:0.82rem"><i class="fas fa-user" style="font-size:0.65rem;color:var(--text-muted);margin-right:2px"></i>${escapeHtml(repName)}</td>
                 <td><strong>${formatMoney(p.grandTotal)} ${getCurrencySymbol(p.currency)}</strong></td>
-                <td><span class="status-badge status-${p.status}">${getStatusText(p.status)}</span></td>
+                <td><span class="status-badge status-${escapeHtml(p.status)}">${escapeHtml(getStatusText(p.status))}</span></td>
                 <td>${formatDate(p.date)}</td>
             </tr>`;
         }).join('');
@@ -615,7 +615,7 @@ function renderReminders() {
                 <div class="rc-header-left">
                     <span class="rc-customer">${escapeHtml(p.customerName)}</span>
                     <span class="rc-date-badge ${dateBadgeCls}"><i class="fas fa-calendar-alt"></i> ${dateLabel}</span>
-                    <span class="status-badge status-${p.status}">${getStatusText(p.status)}</span>
+                    <span class="status-badge status-${escapeHtml(p.status)}">${escapeHtml(getStatusText(p.status))}</span>
                 </div>
                 <div class="rc-actions">${actionsHtml}</div>
             </div>
@@ -1149,7 +1149,7 @@ function renderProposals() {
             </td>
             <td>${formatDate(p.date)}</td>
             <td><strong>${formatMoney(p.grandTotal)} ${getCurrencySymbol(p.currency)}</strong></td>
-            <td><span class="status-badge status-${p.status}">${getStatusText(p.status)}</span></td>
+            <td><span class="status-badge status-${escapeHtml(p.status)}">${escapeHtml(getStatusText(p.status))}</span></td>
             <td>
                 <div class="action-buttons">
                     <button class="btn btn-xs btn-primary" onclick="viewProposalPDF('${p.id}')" title="PDF Görüntüle">
@@ -1169,9 +1169,9 @@ function renderProposals() {
                     <button class="btn btn-xs btn-outline" onclick="updateProposalStatus('${p.id}','red')" title="Reddet" style="color:var(--danger);border-color:var(--danger)">
                         <i class="fas fa-times"></i>
                     </button>` : ''}
-                    <button class="btn btn-xs btn-danger" onclick="deleteProposal('${p.id}')" title="Sil">
+                    ${getCurrentUser() && getCurrentUser().role === 'admin' ? `<button class="btn btn-xs btn-danger" onclick="deleteProposal('${p.id}')" title="Sil">
                         <i class="fas fa-trash"></i>
-                    </button>
+                    </button>` : ''}
                 </div>
             </td>
         </tr>`;
@@ -1401,12 +1401,6 @@ async function executeSend() {
             return;
         }
 
-        const settings = DB.getSettings();
-        if (!settings.smtpHost || !settings.smtpUser || !settings.smtpPass) {
-            showToast('Önce Ayarlar sayfasından SMTP mail ayarlarını yapınız!', 'error');
-            return;
-        }
-
         // Add accept link info
         if (document.getElementById('sendAcceptLink').checked && p) {
             body += '\n\n---\nTeklifi kabul etmek için lütfen bizimle iletişime geçiniz veya bu mesaja "KABUL" yazarak yanıtlayınız.';
@@ -1444,11 +1438,6 @@ async function executeSend() {
                     to,
                     subject,
                     body,
-                    smtpHost: settings.smtpHost,
-                    smtpPort: settings.smtpPort || '587',
-                    smtpUser: settings.smtpUser,
-                    smtpPass: settings.smtpPass,
-                    fromName: settings.companyName || settings.smtpUser,
                     pdfBase64,
                     pdfFilename
                 })
@@ -1544,9 +1533,9 @@ function renderCustomers() {
                     <button class="btn btn-xs btn-outline" onclick="editCustomer('${c.id}')" title="Düzenle">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="btn btn-xs btn-danger" onclick="deleteCustomer('${c.id}')" title="Sil">
+                    ${getCurrentUser() && getCurrentUser().role === 'admin' ? `<button class="btn btn-xs btn-danger" onclick="deleteCustomer('${c.id}')" title="Sil">
                         <i class="fas fa-trash"></i>
-                    </button>
+                    </button>` : ''}
                 </div>
             </td>
         </tr>`;
@@ -1671,9 +1660,9 @@ function renderProducts() {
                     <button class="btn btn-xs btn-outline" onclick="editProduct('${p.id}')" title="Düzenle">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="btn btn-xs btn-danger" onclick="deleteProduct('${p.id}')" title="Sil">
+                    ${getCurrentUser() && getCurrentUser().role === 'admin' ? `<button class="btn btn-xs btn-danger" onclick="deleteProduct('${p.id}')" title="Sil">
                         <i class="fas fa-trash"></i>
-                    </button>
+                    </button>` : ''}
                 </div>
             </td>
         </tr>
@@ -1913,7 +1902,13 @@ function exportAllProposals() {
 
     let csv = 'Teklif No,Müşteri,Tarih,Tutar,Para Birimi,Durum\n';
     proposals.forEach(p => {
-        csv += `"${p.proposalNo}","${p.customerName}","${formatDate(p.date)}","${p.grandTotal}","${p.currency}","${getStatusText(p.status)}"\n`;
+        // Güvenlik: CSV injection koruması - tırnak escape + formül prefix engelleme
+        const csvSafe = (v) => {
+            let s = String(v || '').replace(/"/g, '""');
+            if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+            return s;
+        };
+        csv += `"${csvSafe(p.proposalNo)}","${csvSafe(p.customerName)}","${csvSafe(formatDate(p.date))}","${csvSafe(p.grandTotal)}","${csvSafe(p.currency)}","${csvSafe(getStatusText(p.status))}"\n`;
     });
 
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });

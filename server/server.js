@@ -62,7 +62,7 @@ function verifyToken(token) {
         const [payloadB64, signature] = token.split('.');
         const payload = Buffer.from(payloadB64, 'base64').toString();
         const expected = crypto.createHmac('sha256', JWT_SECRET).update(payload).digest('hex');
-        if (signature !== expected) return null;
+        if (!signature || !expected || !crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'))) return null;
         const data = JSON.parse(payload);
         if (data.exp < Date.now()) return null;
         return data;
@@ -414,13 +414,20 @@ app.get('/api/proposals', authMiddleware, async (req, res) => {
 app.post('/api/proposals', authMiddleware, async (req, res) => {
     try {
         const p = req.body;
+        // Güvenlik: status değerini doğrula
+        const allowedStatuses = ['taslak', 'gönderildi', 'kabul', 'red'];
+        const safeStatus = allowedStatuses.includes(p.status) ? p.status : 'taslak';
+        // Güvenlik: temel alan uzunluk kontrolü
+        if (p.customerName && !validateString(p.customerName, 300)) {
+            return res.status(400).json({ error: 'Müşteri adı çok uzun' });
+        }
         await pool.query(`
             INSERT INTO proposals (id, proposal_no, status, customer_name, contact_person, customer_phone, customer_email, customer_fax, customer_address, tax_office, tax_number, delivery_date, order_no, date, currency, kdv_rate, payment_plan, reminder_date, items, discount, subtotal, discounted_subtotal, kdv, grand_total, additional_services, notes, sales_rep, created_by, created_at, updated_at, call_logs, reminder_completed, accept_token)
             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33)
             ON CONFLICT (id) DO UPDATE SET
                 status=$3, customer_name=$4, contact_person=$5, customer_phone=$6, customer_email=$7, customer_fax=$8, customer_address=$9, tax_office=$10, tax_number=$11, delivery_date=$12, order_no=$13, date=$14, currency=$15, kdv_rate=$16, payment_plan=$17, reminder_date=$18, items=$19, discount=$20, subtotal=$21, discounted_subtotal=$22, kdv=$23, grand_total=$24, additional_services=$25, notes=$26, sales_rep=$27, created_by=$28, updated_at=$30, call_logs=$31, reminder_completed=$32, accept_token=$33
         `, [
-            p.id, p.proposalNo, p.status, p.customerName, p.contactPerson || '', p.customerPhone || '', p.customerEmail || '', p.customerFax || '', p.customerAddress || '', p.taxOffice || '', p.taxNumber || '', p.deliveryDate || '', p.orderNo || '', p.date || null, p.currency || 'USD', p.kdvRate || 20, p.paymentPlan || '', p.reminderDate || null, JSON.stringify(p.items || []), p.discount || 0, p.subtotal || 0, p.discountedSubtotal || 0, p.kdv || 0, p.grandTotal || 0, p.additionalServices || '', p.notes || '', p.salesRep || '', p.createdBy || '', p.createdAt || new Date().toISOString(), p.updatedAt || new Date().toISOString(), JSON.stringify(p.callLogs || []), p.reminderCompleted || false, p.acceptToken || ''
+            p.id, p.proposalNo, safeStatus, p.customerName, p.contactPerson || '', p.customerPhone || '', p.customerEmail || '', p.customerFax || '', p.customerAddress || '', p.taxOffice || '', p.taxNumber || '', p.deliveryDate || '', p.orderNo || '', p.date || null, p.currency || 'USD', p.kdvRate || 20, p.paymentPlan || '', p.reminderDate || null, JSON.stringify(p.items || []), p.discount || 0, p.subtotal || 0, p.discountedSubtotal || 0, p.kdv || 0, p.grandTotal || 0, p.additionalServices || '', p.notes || '', p.salesRep || '', p.createdBy || '', p.createdAt || new Date().toISOString(), p.updatedAt || new Date().toISOString(), JSON.stringify(p.callLogs || []), p.reminderCompleted || false, p.acceptToken || ''
         ]);
         res.json({ success: true });
     } catch (err) {
@@ -608,10 +615,25 @@ const nodemailer = require('nodemailer');
 
 app.post('/api/send-email', authMiddleware, async (req, res) => {
     try {
-        const { to, subject, body, smtpHost, smtpPort, smtpUser, smtpPass, fromName, pdfBase64, pdfFilename } = req.body;
+        const { to, subject, body, pdfBase64, pdfFilename } = req.body;
 
-        if (!to || !smtpHost || !smtpUser || !smtpPass) {
-            return res.status(400).json({ error: 'SMTP ayarları ve alıcı e-posta gereklidir.' });
+        if (!to) {
+            return res.status(400).json({ error: 'Alıcı e-posta gereklidir.' });
+        }
+
+        // Güvenlik: SMTP bilgilerini sunucu tarafında settings'ten al, client'tan kabul etme
+        const settingsResult = await pool.query('SELECT * FROM settings');
+        const settings = {};
+        settingsResult.rows.forEach(row => { settings[row.key] = row.value; });
+
+        const smtpHost = settings.smtpHost;
+        const smtpPort = settings.smtpPort || '587';
+        const smtpUser = settings.smtpUser;
+        const smtpPass = settings.smtpPass;
+        const fromName = settings.companyName || smtpUser;
+
+        if (!smtpHost || !smtpUser || !smtpPass) {
+            return res.status(400).json({ error: 'SMTP ayarları yapılmamış. Ayarlar sayfasından SMTP bilgilerini girin.' });
         }
 
         const transporter = nodemailer.createTransport({
